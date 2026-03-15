@@ -34,9 +34,10 @@ except Exception as e:
     st.error("⚠️ Erro nos Secrets (.streamlit/secrets.toml)")
     st.stop()
 
-# --- FUNÇÃO DE LIMPEZA ---
+# --- FUNÇÃO DE LIMPEZA CIRÚRGICA ANTIDUPLICIDADE ---
 def limpar_dados(df):
     if df is None or df.empty: return pd.DataFrame()
+    
     colunas_limpas = [str(c).strip() for c in df.columns]
     colunas_sem_duplicidade = []
     contagem = {}
@@ -47,20 +48,21 @@ def limpar_dados(df):
         else:
             contagem[c] = 0
             colunas_sem_duplicidade.append(c)
+            
     df.columns = colunas_sem_duplicidade
+
     for col in df.columns:
         if df[col].dtype == "object":
             df[col] = df[col].astype(str).str.strip()
     return df
 
-# --- FUNÇÕES DE BANCO (COM LIMPEZA DE CACHE PARA EVITAR ERRO 429) ---
+# --- FUNÇÕES DE BANCO ---
 def registrar_log(aba, dados):
     try:
-        # Lê usando cache temporário para economizar cota
         df_atual = conn.read(spreadsheet=MINHA_URL, worksheet=aba, ttl="10m")
         df_novo = pd.concat([df_atual, pd.DataFrame([dados])], ignore_index=True)
         conn.update(spreadsheet=MINHA_URL, worksheet=aba, data=df_novo)
-        st.cache_data.clear() # Limpa o cache após gravar para puxar o dado novo na próxima tela
+        st.cache_data.clear()
         st.toast("Missão Registrada! ✅")
     except Exception as e:
         st.error(f"Erro ao salvar: {e}")
@@ -76,7 +78,7 @@ def reset_materia(usuario, materia_alvo):
             mask = ~((df_n[col_usu].str.lower() == usuario.lower()) & (df_n[col_mat] == materia_alvo))
             conn.update(spreadsheet=MINHA_URL, worksheet=aba, data=df[mask])
             
-        st.cache_data.clear() # Limpa o cache para o gráfico atualizar
+        st.cache_data.clear()
         st.success(f"Progresso de '{materia_alvo}' foi zerado!")
         time.sleep(1.5); st.rerun()
     except Exception as e: st.error(f"Erro no Reset: {e}")
@@ -87,12 +89,11 @@ if 'autenticado' not in st.session_state: st.session_state.autenticado = False
 if not st.session_state.autenticado:
     st.markdown('<div style="text-align:center; padding-top: 50px;">', unsafe_allow_html=True)
     st.image(URL_BRASAO, width=120)
-    st.title("DECIFRE O ENIGMA")
+    st.title("ESTRATÉGIA GABARITO")
     with st.form("login"):
         u_input = st.text_input("Usuário PM:").strip().lower()
         p_input = st.text_input("Senha:", type="password").strip()
         if st.form_submit_button("INICIAR MISSÃO", use_container_width=True):
-            # Mudança: ttl="10m" salva requisições
             df_u = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Usuarios", ttl="10m"))
             if not df_u.empty:
                 col_usu = next((c for c in df_u.columns if 'usuario' in c.lower()), df_u.columns[0])
@@ -105,7 +106,7 @@ if not st.session_state.autenticado:
                 else: st.error("Acesso Negado. Verifique os dados.")
     st.stop()
 
-# --- CARREGA HISTÓRICOS (USANDO CACHE DE 10 MINUTOS) ---
+# --- CARREGA HISTÓRICOS ---
 df_hist_q = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Log_Progresso", ttl="10m"))
 df_hist_a = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Assuntos_Estudados", ttl="10m"))
 
@@ -118,11 +119,10 @@ if menu == "🚪 Sair":
     st.session_state.autenticado = False
     st.rerun()
 
-# --- SIMULADO ---
+# --- SIMULADO (FILTROS L e M + COMENTÁRIOS) ---
 if menu == "📝 Simulado":
     area = st.sidebar.selectbox("Área do Edital:", ["Legislacao_Institucional", "Doutrina_Operacional", "Legislacao_Juridica"])
     try:
-        # Cache de 10 minutos para as questões
         df_q = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet=area, ttl="10m"))
         if not df_q.empty:
             while df_q.shape[1] < 13:
@@ -131,8 +131,10 @@ if menu == "📝 Simulado":
             col_id = df_q.columns[0]
             col_pergunta = df_q.columns[3]
             col_gab = df_q.columns[8]
-            col_mat = df_q.columns[11]
-            col_topico = df_q.columns[12]
+            col_exp = df_q.columns[9]     # Coluna J (Explicação)
+            col_pega = df_q.columns[10]   # Coluna K (Pegadinha CRS)
+            col_mat = df_q.columns[11]    # Coluna L
+            col_topico = df_q.columns[12] # Coluna M
             
             leis = sorted([x for x in df_q[col_mat].unique() if str(x).lower() not in ['nan', '']])
             sel_lei = st.selectbox("🎯 Disciplina:", leis)
@@ -201,6 +203,15 @@ if menu == "📝 Simulado":
                         
                         if status == "Acerto": st.success("🎯 ACERTOU!")
                         else: st.error(f"❌ ERROU! Gabarito: {row[col_gab]}")
+                        
+                        # --- EXIBIÇÃO DA EXPLICAÇÃO E PEGADINHA CRS ---
+                        exp_texto = str(row[col_exp]).strip()
+                        if exp_texto.lower() not in ['nan', 'none', '']:
+                            st.info(f"💡 **Comentário:** {exp_texto}")
+                            
+                        pega_texto = str(row[col_pega]).strip()
+                        if pega_texto.lower() not in ['nan', 'none', '']:
+                            st.warning(f"🚨 **Alerta Pegadinha CRS:** {pega_texto}")
                             
     except Exception as e: st.error(f"Erro no Simulado: {e}")
 
