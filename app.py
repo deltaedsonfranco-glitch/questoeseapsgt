@@ -21,6 +21,22 @@ st.markdown("""
     .concluido { background-color: #dcfce7; color: #166534; }
     .pendente { background-color: #f1f5f9; color: #475569; }
     .ytick text { font-weight: bold !important; font-size: 14px !important; color: black !important; }
+    /* Estilo do Botão WhatsApp */
+    .btn-whatsapp {
+        display: block;
+        width: 100%;
+        background-color: #25D366;
+        color: white !important;
+        text-align: center;
+        padding: 12px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: bold;
+        margin-top: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: 0.3s;
+    }
+    .btn-whatsapp:hover { background-color: #128C7E; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -37,7 +53,6 @@ except Exception as e:
 # --- FUNÇÃO DE LIMPEZA CIRÚRGICA ANTIDUPLICIDADE ---
 def limpar_dados(df):
     if df is None or df.empty: return pd.DataFrame()
-    
     colunas_limpas = [str(c).strip() for c in df.columns]
     colunas_sem_duplicidade = []
     contagem = {}
@@ -48,9 +63,7 @@ def limpar_dados(df):
         else:
             contagem[c] = 0
             colunas_sem_duplicidade.append(c)
-            
     df.columns = colunas_sem_duplicidade
-
     for col in df.columns:
         if df[col].dtype == "object":
             df[col] = df[col].astype(str).str.strip()
@@ -85,25 +98,66 @@ def reset_materia(usuario, materia_alvo):
 
 if 'autenticado' not in st.session_state: st.session_state.autenticado = False
 
-# --- LOGIN ---
+# --- LOGIN COM WHATSAPP E TESTE GRÁTIS ---
 if not st.session_state.autenticado:
     st.markdown('<div style="text-align:center; padding-top: 50px;">', unsafe_allow_html=True)
     st.image(URL_BRASAO, width=120)
-    st.title("ESTRATÉGIA GABARITO")
-    with st.form("login"):
-        u_input = st.text_input("Usuário PM:").strip().lower()
-        p_input = st.text_input("Senha:", type="password").strip()
-        if st.form_submit_button("INICIAR MISSÃO", use_container_width=True):
-            df_u = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Usuarios", ttl="10m"))
-            if not df_u.empty:
-                col_usu = next((c for c in df_u.columns if 'usuario' in c.lower()), df_u.columns[0])
-                col_sen = next((c for c in df_u.columns if 'senha' in c.lower()), df_u.columns[1])
-                user_row = df_u[df_u[col_usu].str.lower() == u_input]
-                if not user_row.empty and str(user_row.iloc[0][col_sen]) == p_input:
-                    st.session_state.autenticado = True
-                    st.session_state.usuario = u_input
-                    st.rerun()
-                else: st.error("Acesso Negado. Verifique os dados.")
+    st.title("Banco de Questões - EAP - 3º Sgt PMMG")
+    st.markdown("### 🎯 EAP 3º Sgt PM 2026")
+    
+    col_vazia1, col_form, col_vazia2 = st.columns([1, 1.5, 1])
+    
+    with col_form:
+        with st.form("login"):
+            u_input = st.text_input("Usuário ou E-mail:").strip().lower()
+            p_input = st.text_input("Senha:", type="password").strip()
+            submit = st.form_submit_button("INICIAR MISSÃO", use_container_width=True)
+            
+            if submit:
+                df_u = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Usuarios", ttl="10m"))
+                if not df_u.empty:
+                    col_usu = next((c for c in df_u.columns if 'usuario' in c.lower()), df_u.columns[0])
+                    col_sen = next((c for c in df_u.columns if 'senha' in c.lower()), df_u.columns[1])
+                    col_val = next((c for c in df_u.columns if 'validade' in c.lower() or 'expiracao' in c.lower()), None)
+                    
+                    user_row = df_u[df_u[col_usu].str.lower() == u_input]
+                    
+                    if not user_row.empty and str(user_row.iloc[0][col_sen]) == p_input:
+                        acesso_liberado = True
+                        
+                        if col_val is not None:
+                            data_limite_str = str(user_row.iloc[0][col_val]).strip()
+                            if data_limite_str and data_limite_str.lower() not in ['nan', 'none', '']:
+                                try:
+                                    data_limite = datetime.datetime.strptime(data_limite_str, "%d/%m/%Y").date()
+                                    if datetime.date.today() > data_limite:
+                                        acesso_liberado = False
+                                except ValueError:
+                                    pass 
+                        
+                        if acesso_liberado:
+                            st.session_state.autenticado = True
+                            st.session_state.usuario = u_input
+                            st.rerun()
+                        else:
+                            st.error("⏳ SEU TESTE GRÁTIS EXPIROU!")
+                            st.warning("O seu tempo de missão acabou. O QG de Inteligência está bloqueado. Adquira o acesso definitivo e continue sua preparação para o EAP 2026!")
+                    else: 
+                        st.error("❌ Acesso Negado. Verifique os dados inseridos.")
+
+        # --- BOTÃO DO WHATSAPP AQUI ---
+        NUMERO_WHATSAPP = "5535999419840"  # <--- COLOCAR SEU NÚMERO AQUI (DDD + NÚMERO, sem espaços)
+        MENSAGEM_WHATSAPP = "Olá! Tenho interesse em adquirir o acesso definitivo ao aplicativo Questões EAP 3º Sgt PM 2026."
+        
+        url_whatsapp = f"https://wa.me/{NUMERO_WHATSAPP}?text={MENSAGEM_WHATSAPP.replace(' ', '%20')}"
+        
+        st.markdown(f"""
+            <a href="{url_whatsapp}" target="_blank" class="btn-whatsapp">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" width="22" style="vertical-align: middle; margin-right: 8px;">
+                Adquira seu Acesso / Suporte
+            </a>
+        """, unsafe_allow_html=True)
+        
     st.stop()
 
 # --- CARREGA HISTÓRICOS ---
@@ -112,14 +166,14 @@ df_hist_a = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Assuntos_Es
 
 # --- NAVEGAÇÃO ---
 st.sidebar.image(URL_BRASAO, width=80)
-st.sidebar.markdown(f"### 🎖️ Sgt {st.session_state.usuario.upper()}")
+st.sidebar.markdown(f"### 🎖️ Combatente: {st.session_state.usuario.split('@')[0].upper()}")
 menu = st.sidebar.radio("Quartel General:", ["📝 Simulado", "📊 Performance", "🚪 Sair"])
 
 if menu == "🚪 Sair":
     st.session_state.autenticado = False
     st.rerun()
 
-# --- SIMULADO (FILTROS L e M + COMENTÁRIOS) ---
+# --- SIMULADO ---
 if menu == "📝 Simulado":
     area = st.sidebar.selectbox("Área do Edital:", ["Legislacao_Institucional", "Doutrina_Operacional", "Legislacao_Juridica"])
     try:
@@ -131,10 +185,10 @@ if menu == "📝 Simulado":
             col_id = df_q.columns[0]
             col_pergunta = df_q.columns[3]
             col_gab = df_q.columns[8]
-            col_exp = df_q.columns[9]     # Coluna J (Explicação)
-            col_pega = df_q.columns[10]   # Coluna K (Pegadinha CRS)
-            col_mat = df_q.columns[11]    # Coluna L
-            col_topico = df_q.columns[12] # Coluna M
+            col_exp = df_q.columns[9]
+            col_pega = df_q.columns[10]
+            col_mat = df_q.columns[11]
+            col_topico = df_q.columns[12]
             
             leis = sorted([x for x in df_q[col_mat].unique() if str(x).lower() not in ['nan', '']])
             sel_lei = st.selectbox("🎯 Disciplina:", leis)
@@ -204,7 +258,6 @@ if menu == "📝 Simulado":
                         if status == "Acerto": st.success("🎯 ACERTOU!")
                         else: st.error(f"❌ ERROU! Gabarito: {row[col_gab]}")
                         
-                        # --- EXIBIÇÃO DA EXPLICAÇÃO E PEGADINHA CRS ---
                         exp_texto = str(row[col_exp]).strip()
                         if exp_texto.lower() not in ['nan', 'none', '']:
                             st.info(f"💡 **Comentário:** {exp_texto}")
