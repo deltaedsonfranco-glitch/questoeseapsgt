@@ -21,20 +21,11 @@ st.markdown("""
     .concluido { background-color: #dcfce7; color: #166534; }
     .pendente { background-color: #f1f5f9; color: #475569; }
     .ytick text { font-weight: bold !important; font-size: 14px !important; color: black !important; }
-    /* Estilo do Botão WhatsApp */
+    /* Botão WhatsApp */
     .btn-whatsapp {
-        display: block;
-        width: 100%;
-        background-color: #25D366;
-        color: white !important;
-        text-align: center;
-        padding: 12px;
-        border-radius: 8px;
-        text-decoration: none;
-        font-weight: bold;
-        margin-top: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        transition: 0.3s;
+        display: block; width: 100%; background-color: #25D366; color: white !important;
+        text-align: center; padding: 12px; border-radius: 8px; text-decoration: none;
+        font-weight: bold; margin-top: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: 0.3s;
     }
     .btn-whatsapp:hover { background-color: #128C7E; }
     </style>
@@ -69,16 +60,34 @@ def limpar_dados(df):
             df[col] = df[col].astype(str).str.strip()
     return df
 
-# --- FUNÇÕES DE BANCO ---
+# --- FUNÇÕES DE BANCO E CALLBACKS ---
 def registrar_log(aba, dados):
     try:
-        df_atual = conn.read(spreadsheet=MINHA_URL, worksheet=aba, ttl="10m")
+        # Puxa versão fresquinha silenciosamente e salva
+        df_atual = conn.read(spreadsheet=MINHA_URL, worksheet=aba, ttl=0)
         df_novo = pd.concat([df_atual, pd.DataFrame([dados])], ignore_index=True)
         conn.update(spreadsheet=MINHA_URL, worksheet=aba, data=df_novo)
-        st.cache_data.clear()
-        st.toast("Missão Registrada! ✅")
     except Exception as e:
         st.error(f"Erro ao salvar: {e}")
+
+# CALLBACK: Executa instantaneamente sem quebrar a posição da tela
+def validar_questao_callback(q_id, radio_key, ops, gabarito, explicacao, pegadinha, materia, topico, usuario):
+    escolha = st.session_state[radio_key]
+    letra = [l for l, t in ops.items() if t == escolha][0]
+    status = "Acerto" if letra == str(gabarito).strip().upper() else "Erro"
+    
+    # 1. Salva no banco de dados
+    registrar_log("Log_Progresso", {
+        "Usuario": usuario, "Materia": materia, 
+        "Titulo": topico, "Questao": q_id, 
+        "Status": status, "Data": datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    })
+    
+    # 2. Salva na memória da sessão para feedback instantâneo na UI
+    st.session_state[f"status_q_{q_id}"] = status
+    st.session_state[f"gab_q_{q_id}"] = gabarito
+    st.session_state[f"exp_q_{q_id}"] = explicacao
+    st.session_state[f"pega_q_{q_id}"] = pegadinha
 
 def reset_materia(usuario, materia_alvo):
     try:
@@ -102,7 +111,7 @@ if 'autenticado' not in st.session_state: st.session_state.autenticado = False
 if not st.session_state.autenticado:
     st.markdown('<div style="text-align:center; padding-top: 50px;">', unsafe_allow_html=True)
     st.image(URL_BRASAO, width=120)
-    st.title("Banco de Questões - EAP - 3º Sgt PMMG")
+    st.title("ESTRATÉGIA GABARITO")
     st.markdown("### 🎯 EAP 3º Sgt PM 2026")
     
     col_vazia1, col_form, col_vazia2 = st.columns([1, 1.5, 1])
@@ -124,7 +133,6 @@ if not st.session_state.autenticado:
                     
                     if not user_row.empty and str(user_row.iloc[0][col_sen]) == p_input:
                         acesso_liberado = True
-                        
                         if col_val is not None:
                             data_limite_str = str(user_row.iloc[0][col_val]).strip()
                             if data_limite_str and data_limite_str.lower() not in ['nan', 'none', '']:
@@ -145,10 +153,9 @@ if not st.session_state.autenticado:
                     else: 
                         st.error("❌ Acesso Negado. Verifique os dados inseridos.")
 
-        # --- BOTÃO DO WHATSAPP AQUI ---
-        NUMERO_WHATSAPP = "5535999419840"  # <--- COLOCAR SEU NÚMERO AQUI (DDD + NÚMERO, sem espaços)
+        # --- BOTÃO DO WHATSAPP ---
+        NUMERO_WHATSAPP = "5535999999999"  # <--- COLOCAR SEU NÚMERO AQUI
         MENSAGEM_WHATSAPP = "Olá! Tenho interesse em adquirir o acesso definitivo ao aplicativo Questões EAP 3º Sgt PM 2026."
-        
         url_whatsapp = f"https://wa.me/{NUMERO_WHATSAPP}?text={MENSAGEM_WHATSAPP.replace(' ', '%20')}"
         
         st.markdown(f"""
@@ -173,7 +180,7 @@ if menu == "🚪 Sair":
     st.session_state.autenticado = False
     st.rerun()
 
-# --- SIMULADO ---
+# --- SIMULADO (INSTANTÂNEO) ---
 if menu == "📝 Simulado":
     area = st.sidebar.selectbox("Área do Edital:", ["Legislacao_Institucional", "Doutrina_Operacional", "Legislacao_Juridica"])
     try:
@@ -182,17 +189,12 @@ if menu == "📝 Simulado":
             while df_q.shape[1] < 13:
                 df_q[f"coluna_{df_q.shape[1]}"] = ""
 
-            col_id = df_q.columns[0]
-            col_pergunta = df_q.columns[3]
-            col_gab = df_q.columns[8]
-            col_exp = df_q.columns[9]
-            col_pega = df_q.columns[10]
-            col_mat = df_q.columns[11]
-            col_topico = df_q.columns[12]
+            col_id = df_q.columns[0]; col_pergunta = df_q.columns[3]; col_gab = df_q.columns[8]
+            col_exp = df_q.columns[9]; col_pega = df_q.columns[10]
+            col_mat = df_q.columns[11]; col_topico = df_q.columns[12]
             
             leis = sorted([x for x in df_q[col_mat].unique() if str(x).lower() not in ['nan', '']])
             sel_lei = st.selectbox("🎯 Disciplina:", leis)
-            
             df_f_lei = df_q[df_q[col_mat] == sel_lei]
             
             titulos = sorted([x for x in df_f_lei[col_topico].unique() if str(x).lower() not in ['nan', '']])
@@ -201,11 +203,9 @@ if menu == "📝 Simulado":
             if sel_titulo != "VER TUDO":
                 id_a = f"{sel_lei} - {sel_titulo}"
                 ja_estudado = False
-                
                 if not df_hist_a.empty:
                     col_usu_a = next((c for c in df_hist_a.columns if 'usuario' in c.lower()), df_hist_a.columns[0])
                     col_topicos = [c for c in df_hist_a.columns if 'topico' in c.lower()]
-                    
                     df_user_a = df_hist_a[df_hist_a[col_usu_a].str.lower() == st.session_state.usuario]
                     for c in col_topicos:
                         if not df_user_a[df_user_a[c] == id_a].empty:
@@ -216,68 +216,82 @@ if menu == "📝 Simulado":
                     st.success("✅ Tópico já marcado como ESTUDADO.")
                 else:
                     if st.button("🏁 Marcar Tópico como Estudado", use_container_width=True):
-                        registrar_log("Assuntos_Estudados", {
-                            "Usuario": st.session_state.usuario,
-                            "Materia": sel_lei,
-                            "Topico": id_a,
-                            "Status": "Concluído",
-                            "Data": datetime.datetime.now().strftime("%d/%m/%Y")
-                        })
+                        registrar_log("Assuntos_Estudados", {"Usuario": st.session_state.usuario, "Materia": sel_lei, "Topico": id_a, "Status": "Concluído", "Data": datetime.datetime.now().strftime("%d/%m/%Y")})
+                        st.cache_data.clear() # Limpa cache para o botão sumir
                         st.rerun()
             st.divider()
 
             df_exibir = df_f_lei if sel_titulo == "VER TUDO" else df_f_lei[df_f_lei[col_topico] == sel_titulo]
 
-            minhas_q = []
+            # Lista de resolvidas no Banco
+            minhas_q_banco = []
             if not df_hist_q.empty:
                 col_usu_hist = next((c for c in df_hist_q.columns if 'usuario' in c.lower()), df_hist_q.columns[0])
                 col_q_hist = next((c for c in df_hist_q.columns if 'questao' in c.lower()), df_hist_q.columns[3])
-                minhas_q = df_hist_q[df_hist_q[col_usu_hist].str.lower() == st.session_state.usuario][col_q_hist].tolist()
+                minhas_q_banco = df_hist_q[df_hist_q[col_usu_hist].str.lower() == st.session_state.usuario][col_q_hist].tolist()
 
             for i, row in df_exibir.iterrows():
                 q_id = str(row[col_id])
-                badge = '<span class="status-badge concluido">FEITA</span>' if q_id in minhas_q else '<span class="status-badge pendente">PENDENTE</span>'
+                
+                # Inteligência de Estado: Verifica se foi feita no banco OU agorinha na memória
+                feita_banco = q_id in minhas_q_banco
+                feita_agora = f"status_q_{q_id}" in st.session_state
+                ja_resolvida = feita_banco or feita_agora
+                
+                badge = '<span class="status-badge concluido">RESOLVIDA</span>' if ja_resolvida else '<span class="status-badge pendente">PENDENTE</span>'
                 
                 with st.container():
                     st.markdown(f'<div class="question-box"><b>Q{q_id}</b> {badge}<br><br>{row[col_pergunta]}</div>', unsafe_allow_html=True)
                     ops = {"A": row.iloc[4], "B": row.iloc[5], "C": row.iloc[6], "D": row.iloc[7]}
                     opcoes_validas = [v for v in ops.values() if str(v).lower() != 'nan' and str(v).strip() != '']
                     
-                    escolha = st.radio(f"Res Q{q_id}:", opcoes_validas, key=f"r_{q_id}", label_visibility="collapsed")
+                    # Radio bloqueado se já foi resolvida
+                    escolha = st.radio(f"Res Q{q_id}:", opcoes_validas, key=f"r_{q_id}", label_visibility="collapsed", disabled=ja_resolvida)
                     
-                    if st.button(f"Validar Q{q_id}", key=f"b_{q_id}", use_container_width=True):
-                        letra = [l for l, t in ops.items() if t == escolha][0]
-                        status = "Acerto" if letra == str(row[col_gab]).strip().upper() else "Erro"
-                        
-                        registrar_log("Log_Progresso", {
-                            "Usuario": st.session_state.usuario, "Materia": sel_lei, 
-                            "Titulo": row[col_topico] if sel_titulo == "VER TUDO" else sel_titulo, 
-                            "Questao": q_id, "Status": status, "Data": datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
-                        })
-                        
-                        if status == "Acerto": st.success("🎯 ACERTOU!")
-                        else: st.error(f"❌ ERROU! Gabarito: {row[col_gab]}")
-                        
-                        exp_texto = str(row[col_exp]).strip()
-                        if exp_texto.lower() not in ['nan', 'none', '']:
-                            st.info(f"💡 **Comentário:** {exp_texto}")
+                    if not ja_resolvida:
+                        topico_log = row[col_topico] if sel_titulo == "VER TUDO" else sel_titulo
+                        st.button(f"Validar Q{q_id}", key=f"b_{q_id}", use_container_width=True, 
+                                  on_click=validar_questao_callback, 
+                                  args=(q_id, f"r_{q_id}", ops, row[col_gab], row[col_exp], row[col_pega], sel_lei, topico_log, st.session_state.usuario))
+                    else:
+                        # Exibe o Feedback
+                        if feita_agora:
+                            status = st.session_state[f"status_q_{q_id}"]
+                            if status == "Acerto": st.success("🎯 ACERTOU!")
+                            else: st.error(f"❌ ERROU! Gabarito: {st.session_state[f'gab_q_{q_id}']}")
                             
-                        pega_texto = str(row[col_pega]).strip()
-                        if pega_texto.lower() not in ['nan', 'none', '']:
-                            st.warning(f"🚨 **Alerta Pegadinha CRS:** {pega_texto}")
-                            
+                            exp_texto = str(st.session_state[f"exp_q_{q_id}"]).strip()
+                            if exp_texto.lower() not in ['nan', 'none', '']: st.info(f"💡 **Comentário:** {exp_texto}")
+                                
+                            pega_texto = str(st.session_state[f"pega_q_{q_id}"]).strip()
+                            if pega_texto.lower() not in ['nan', 'none', '']: st.warning(f"🚨 **Pegadinha CRS:** {pega_texto}")
+                        else:
+                            st.success("✅ Questão já resolvida em treinamentos anteriores.")
+                            with st.expander("Ver Gabarito e Comentários"):
+                                st.write(f"**Gabarito Correto:** {row[col_gab]}")
+                                exp_texto = str(row[col_exp]).strip()
+                                if exp_texto.lower() not in ['nan', 'none', '']: st.info(f"💡 **Comentário:** {exp_texto}")
+                                pega_texto = str(row[col_pega]).strip()
+                                if pega_texto.lower() not in ['nan', 'none', '']: st.warning(f"🚨 **Pegadinha CRS:** {pega_texto}")
+                                
     except Exception as e: st.error(f"Erro no Simulado: {e}")
 
 # --- PERFORMANCE ---
 elif menu == "📊 Performance":
-    st.title("📊 Painel de Inteligência e Performance")
+    col_t1, col_t2 = st.columns([3, 1])
+    col_t1.title("📊 Inteligência de Performance")
+    
+    # Botão para sincronizar dados da nuvem para o painel
+    if col_t2.button("🔄 Atualizar Dados", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
     
     if not df_hist_q.empty:
         col_usu_hist = next((c for c in df_hist_q.columns if 'usuario' in c.lower()), df_hist_q.columns[0])
         meu_h = df_hist_q[df_hist_q[col_usu_hist].str.lower() == st.session_state.usuario].copy()
         
         if meu_h.empty:
-            st.warning("O seu usuário ainda não registrou respostas no banco de dados.")
+            st.warning("Nenhum dado sincronizado. Resolva questões e clique em 'Atualizar Dados'.")
         else:
             col_status = next((c for c in meu_h.columns if 'status' in c.lower()), meu_h.columns[4])
             acertos = len(meu_h[meu_h[col_status] == 'Acerto'])
@@ -316,21 +330,10 @@ elif menu == "📊 Performance":
                 df_p = df_p.sort_values('Perc', ascending=True)
 
                 fig_p = go.Figure()
-                fig_p.add_trace(go.Bar(
-                    y=df_p['materia_q'], x=df_p['Perc'], orientation='h', 
-                    marker_color='#28a745', name='Concluído',
-                    text=df_p['Perc'].apply(lambda x: f"<b>{x:.1f}%</b>"), textposition='inside'
-                ))
-                fig_p.add_trace(go.Bar(
-                    y=df_p['materia_q'], x=df_p['Resto'], orientation='h', 
-                    marker_color='#e9ecef', name='Pendente', hoverinfo='none'
-                ))
+                fig_p.add_trace(go.Bar(y=df_p['materia_q'], x=df_p['Perc'], orientation='h', marker_color='#28a745', name='Concluído', text=df_p['Perc'].apply(lambda x: f"<b>{x:.1f}%</b>"), textposition='inside'))
+                fig_p.add_trace(go.Bar(y=df_p['materia_q'], x=df_p['Resto'], orientation='h', marker_color='#e9ecef', name='Pendente', hoverinfo='none'))
                 
-                fig_p.update_layout(
-                    barmode='stack', showlegend=False, height=max(400, len(df_p)*40),
-                    xaxis=dict(range=[0, 100], dtick=10, title="Conclusão (%)"),
-                    yaxis=dict(title=""), template="plotly_white", margin=dict(l=200)
-                )
+                fig_p.update_layout(barmode='stack', showlegend=False, height=max(400, len(df_p)*40), xaxis=dict(range=[0, 100], dtick=10, title="Conclusão (%)"), yaxis=dict(title=""), template="plotly_white", margin=dict(l=200))
                 st.plotly_chart(fig_p, use_container_width=True)
 
             st.subheader("📈 Constância de Estudos Diários")
