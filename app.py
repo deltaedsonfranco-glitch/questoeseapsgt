@@ -63,10 +63,10 @@ def limpar_dados(df):
 # --- FUNÇÕES DE BANCO E CALLBACKS ---
 def registrar_log(aba, dados):
     try:
-        # Puxa versão fresquinha silenciosamente e salva
         df_atual = conn.read(spreadsheet=MINHA_URL, worksheet=aba, ttl=0)
         df_novo = pd.concat([df_atual, pd.DataFrame([dados])], ignore_index=True)
         conn.update(spreadsheet=MINHA_URL, worksheet=aba, data=df_novo)
+        st.cache_data.clear() # Limpa a memória para forçar atualização
     except Exception as e:
         st.error(f"Erro ao salvar: {e}")
 
@@ -76,14 +76,14 @@ def validar_questao_callback(q_id, radio_key, ops, gabarito, explicacao, pegadin
     letra = [l for l, t in ops.items() if t == escolha][0]
     status = "Acerto" if letra == str(gabarito).strip().upper() else "Erro"
     
-    # 1. Salva no banco de dados
+    # Salva no banco
     registrar_log("Log_Progresso", {
         "Usuario": usuario, "Materia": materia, 
         "Titulo": topico, "Questao": q_id, 
         "Status": status, "Data": datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
     })
     
-    # 2. Salva na memória da sessão para feedback instantâneo na UI
+    # Salva na memória de curto prazo (Sessão)
     st.session_state[f"status_q_{q_id}"] = status
     st.session_state[f"gab_q_{q_id}"] = gabarito
     st.session_state[f"exp_q_{q_id}"] = explicacao
@@ -107,7 +107,7 @@ def reset_materia(usuario, materia_alvo):
 
 if 'autenticado' not in st.session_state: st.session_state.autenticado = False
 
-# --- LOGIN COM WHATSAPP E TESTE GRÁTIS ---
+# --- LOGIN ---
 if not st.session_state.autenticado:
     st.markdown('<div style="text-align:center; padding-top: 50px;">', unsafe_allow_html=True)
     st.image(URL_BRASAO, width=120)
@@ -144,12 +144,13 @@ if not st.session_state.autenticado:
                                     pass 
                         
                         if acesso_liberado:
+                            st.cache_data.clear() # Limpa a memória para garantir dados frescos no login
                             st.session_state.autenticado = True
                             st.session_state.usuario = u_input
                             st.rerun()
                         else:
                             st.error("⏳ SEU TESTE GRÁTIS EXPIROU!")
-                            st.warning("O seu tempo de missão acabou. O QG de Inteligência está bloqueado. Adquira o acesso definitivo e continue sua preparação para o EAP 2026!")
+                            st.warning("O seu tempo de missão acabou. Adquira o acesso definitivo e continue sua preparação para o EAP 2026!")
                     else: 
                         st.error("❌ Acesso Negado. Verifique os dados inseridos.")
 
@@ -178,9 +179,10 @@ menu = st.sidebar.radio("Quartel General:", ["📝 Simulado", "📊 Performance"
 
 if menu == "🚪 Sair":
     st.session_state.autenticado = False
+    st.cache_data.clear()
     st.rerun()
 
-# --- SIMULADO (INSTANTÂNEO) ---
+# --- SIMULADO ---
 if menu == "📝 Simulado":
     area = st.sidebar.selectbox("Área do Edital:", ["Legislacao_Institucional", "Doutrina_Operacional", "Legislacao_Juridica"])
     try:
@@ -207,8 +209,11 @@ if menu == "📝 Simulado":
                     col_usu_a = next((c for c in df_hist_a.columns if 'usuario' in c.lower()), df_hist_a.columns[0])
                     col_topicos = [c for c in df_hist_a.columns if 'topico' in c.lower()]
                     df_user_a = df_hist_a[df_hist_a[col_usu_a].str.lower() == st.session_state.usuario]
+                    
                     for c in col_topicos:
-                        if not df_user_a[df_user_a[c] == id_a].empty:
+                        # Extrai e limpa os tópicos do banco para evitar falsos negativos
+                        topicos_salvos = [str(x).strip() for x in df_user_a[c].tolist()]
+                        if id_a.strip() in topicos_salvos:
                             ja_estudado = True
                             break
                 
@@ -217,23 +222,25 @@ if menu == "📝 Simulado":
                 else:
                     if st.button("🏁 Marcar Tópico como Estudado", use_container_width=True):
                         registrar_log("Assuntos_Estudados", {"Usuario": st.session_state.usuario, "Materia": sel_lei, "Topico": id_a, "Status": "Concluído", "Data": datetime.datetime.now().strftime("%d/%m/%Y")})
-                        st.cache_data.clear() # Limpa cache para o botão sumir
+                        st.cache_data.clear()
                         st.rerun()
             st.divider()
 
             df_exibir = df_f_lei if sel_titulo == "VER TUDO" else df_f_lei[df_f_lei[col_topico] == sel_titulo]
 
-            # Lista de resolvidas no Banco
+            # BLINDAGEM DE DADOS: Assegura que o ID da questão salva seja lido como Texto sem decimais
             minhas_q_banco = []
             if not df_hist_q.empty:
                 col_usu_hist = next((c for c in df_hist_q.columns if 'usuario' in c.lower()), df_hist_q.columns[0])
                 col_q_hist = next((c for c in df_hist_q.columns if 'questao' in c.lower()), df_hist_q.columns[3])
-                minhas_q_banco = df_hist_q[df_hist_q[col_usu_hist].str.lower() == st.session_state.usuario][col_q_hist].tolist()
+                
+                # Transforma "1.0" em "1", garantindo a checagem correta
+                minhas_q_banco = [str(x).split('.')[0].strip() for x in df_hist_q[df_hist_q[col_usu_hist].str.lower() == st.session_state.usuario][col_q_hist].tolist()]
 
             for i, row in df_exibir.iterrows():
-                q_id = str(row[col_id])
+                # Transforma o ID atual em texto limpo sem decimais também
+                q_id = str(row[col_id]).split('.')[0].strip()
                 
-                # Inteligência de Estado: Verifica se foi feita no banco OU agorinha na memória
                 feita_banco = q_id in minhas_q_banco
                 feita_agora = f"status_q_{q_id}" in st.session_state
                 ja_resolvida = feita_banco or feita_agora
@@ -245,7 +252,6 @@ if menu == "📝 Simulado":
                     ops = {"A": row.iloc[4], "B": row.iloc[5], "C": row.iloc[6], "D": row.iloc[7]}
                     opcoes_validas = [v for v in ops.values() if str(v).lower() != 'nan' and str(v).strip() != '']
                     
-                    # Radio bloqueado se já foi resolvida
                     escolha = st.radio(f"Res Q{q_id}:", opcoes_validas, key=f"r_{q_id}", label_visibility="collapsed", disabled=ja_resolvida)
                     
                     if not ja_resolvida:
@@ -254,7 +260,6 @@ if menu == "📝 Simulado":
                                   on_click=validar_questao_callback, 
                                   args=(q_id, f"r_{q_id}", ops, row[col_gab], row[col_exp], row[col_pega], sel_lei, topico_log, st.session_state.usuario))
                     else:
-                        # Exibe o Feedback
                         if feita_agora:
                             status = st.session_state[f"status_q_{q_id}"]
                             if status == "Acerto": st.success("🎯 ACERTOU!")
@@ -281,7 +286,6 @@ elif menu == "📊 Performance":
     col_t1, col_t2 = st.columns([3, 1])
     col_t1.title("📊 Inteligência de Performance")
     
-    # Botão para sincronizar dados da nuvem para o painel
     if col_t2.button("🔄 Atualizar Dados", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
