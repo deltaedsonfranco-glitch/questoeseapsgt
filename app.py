@@ -6,34 +6,349 @@ import time
 import plotly.express as px
 import plotly.graph_objects as go
 
-# 1. ESTILO E IDENTIDADE VISUAL
-st.set_page_config(page_title="QG DO EAP - Inteligência", page_icon="🛡️", layout="wide")
+# ═══════════════════════════════════════════════
+#  CONSTANCY — EAP 3º SGT PM 2026 | BANCA CRS
+# ═══════════════════════════════════════════════
 
+st.set_page_config(
+    page_title="CONSTANCY · EAP 2026",
+    page_icon="🎯",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# ─── PALETA E ESTILOS ───────────────────────────
 st.markdown("""
-    <style>
-    .stApp { background-color: #f4f7f6; }
-    .question-box {
-        background-color: white; padding: 25px; border-radius: 15px;
-        border-left: 8px solid #1e3a8a; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        margin-bottom: 20px; color: #1e293b;
-    }
-    .status-badge { font-weight: 700; font-size: 0.75rem; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; }
-    .concluido { background-color: #dcfce7; color: #166534; }
-    .pendente { background-color: #f1f5f9; color: #475569; }
-    .ytick text { font-weight: bold !important; font-size: 14px !important; color: black !important; }
-    /* Botão WhatsApp */
-    .btn-whatsapp {
-        display: block; width: 100%; background-color: #25D366; color: white !important;
-        text-align: center; padding: 12px; border-radius: 8px; text-decoration: none;
-        font-weight: bold; margin-top: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: 0.3s;
-    }
-    .btn-whatsapp:hover { background-color: #128C7E; }
-    </style>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+    --azul-escudo:   #0f2040;
+    --azul-medio:    #1a3a6b;
+    --azul-claro:    #2563eb;
+    --dourado:       #c8a84b;
+    --dourado-light: #f0d078;
+    --verde:         #16a34a;
+    --verde-bg:      #dcfce7;
+    --vermelho:      #dc2626;
+    --vermelho-bg:   #fee2e2;
+    --amarelo-bg:    #fef9c3;
+    --cinza-bg:      #f1f5f9;
+    --cinza-borda:   #e2e8f0;
+    --texto-escuro:  #0f172a;
+    --texto-medio:   #475569;
+    --branco:        #ffffff;
+}
+
+/* RESET GERAL */
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+
+/* BACKGROUND DO APP */
+.stApp {
+    background: linear-gradient(160deg, #0a1628 0%, #0f2040 40%, #0a1628 100%);
+    min-height: 100vh;
+}
+
+/* TEXTO GLOBAL — garante legibilidade no tema escuro */
+.stApp p, .stApp span, .stApp div, .stApp li, .stApp label { color: #e2e8f0; }
+.stMarkdown, .stMarkdown p { color: #e2e8f0 !important; }
+
+/* SIDEBAR */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #06111e 0%, #0d1f38 100%) !important;
+    border-right: 1px solid rgba(200,168,75,0.25) !important;
+}
+[data-testid="stSidebar"] * { color: #e2e8f0 !important; }
+[data-testid="stSidebar"] .stRadio label { 
+    padding: 10px 14px; border-radius: 8px; transition: 0.2s;
+    cursor: pointer; display: block;
+}
+[data-testid="stSidebar"] .stRadio label:hover { 
+    background: rgba(200,168,75,0.12) !important;
+}
+
+/* CABEÇALHO MARCA */
+.brand-header {
+    text-align: center;
+    padding: 10px 0 6px 0;
+    border-bottom: 1px solid rgba(200,168,75,0.3);
+    margin-bottom: 10px;
+}
+.brand-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.1rem;
+    letter-spacing: 4px;
+    background: linear-gradient(135deg, #c8a84b, #f0d078, #c8a84b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+    margin: 0;
+}
+.brand-sub {
+    font-size: 0.68rem;
+    letter-spacing: 3px;
+    color: #94a3b8 !important;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+/* CARDS DE QUESTÃO */
+.card-questao {
+    background: rgba(20,40,80,0.92);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-left: 4px solid var(--azul-claro);
+    border-radius: 12px;
+    padding: 22px 26px 16px 26px;
+    margin-bottom: 6px;
+    color: #f1f5f9;
+    backdrop-filter: blur(8px);
+    transition: border-color 0.3s;
+}
+.card-questao.resolvida { border-left-color: var(--dourado); }
+
+.q-numero {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #60a5fa;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* BADGES */
+.badge {
+    display: inline-block; font-size: 0.65rem; font-weight: 700;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 20px;
+}
+.badge-pendente { background: rgba(148,163,184,0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3); }
+.badge-resolvida { background: rgba(200,168,75,0.15); color: var(--dourado); border: 1px solid rgba(200,168,75,0.35); }
+.badge-acerto   { background: rgba(22,163,74,0.15); color: #4ade80; border: 1px solid rgba(22,163,74,0.35); }
+.badge-erro     { background: rgba(220,38,38,0.15); color: #f87171; border: 1px solid rgba(220,38,38,0.35); }
+
+.q-texto { font-size: 1rem !important; line-height: 1.75 !important; color: #f1f5f9 !important; font-weight: 400; }
+
+/* FEEDBACK RESULTADO */
+.feedback-box {
+    border-radius: 10px; padding: 14px 18px;
+    margin-top: 12px; font-size: 0.9rem; font-weight: 500;
+}
+.feedback-acerto { background: rgba(22,163,74,0.12); border: 1px solid rgba(22,163,74,0.3); color: #4ade80; }
+.feedback-erro   { background: rgba(220,38,38,0.10); border: 1px solid rgba(220,38,38,0.3); color: #f87171; }
+.feedback-info   { background: rgba(37,99,235,0.10); border: 1px solid rgba(37,99,235,0.3); color: #93c5fd; margin-top: 8px; }
+.feedback-warn   { background: rgba(234,179,8,0.10); border: 1px solid rgba(234,179,8,0.3); color: #fde047; margin-top: 8px; }
+
+/* MÉTRICAS */
+.metric-card {
+    background: rgba(20,40,80,0.92);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 14px;
+    padding: 20px 24px;
+    text-align: center;
+    color: #f1f5f9;
+}
+.metric-valor {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.8rem;
+    letter-spacing: 2px;
+    color: var(--dourado);
+    line-height: 1;
+}
+.metric-label { font-size: 0.72rem; letter-spacing: 2px; color: #64748b; text-transform: uppercase; margin-top: 4px; }
+
+/* TÍTULOS DE SEÇÃO */
+.secao-titulo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    letter-spacing: 3px;
+    color: #f1f5f9;
+    border-bottom: 2px solid rgba(200,168,75,0.4);
+    padding-bottom: 6px;
+    margin: 24px 0 16px 0;
+}
+
+/* DECORAÇÃO TÁTICA NO FUNDO */
+.topo-page {
+    background: rgba(200,168,75,0.04);
+    border: 1px solid rgba(200,168,75,0.15);
+    border-radius: 16px;
+    padding: 20px 28px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* INPUTS — fundo branco, texto PRETO legível */
+.stTextInput > div > div > input,
+input[type="text"],
+input[type="password"],
+input[type="email"] {
+    background: #ffffff !important;
+    border: 1.5px solid #c8a84b !important;
+    border-radius: 8px !important;
+    color: #0f172a !important;
+    font-size: 0.95rem !important;
+    font-weight: 500 !important;
+    caret-color: #0f172a !important;
+    padding: 10px 14px !important;
+}
+input[type="text"]::placeholder,
+input[type="password"]::placeholder { color: #94a3b8 !important; }
+/* Cobertura máxima para qualquer input do Streamlit */
+input { background: #ffffff !important; color: #0f172a !important; }
+/* Labels dos campos */
+.stTextInput label, .stTextInput > label { color: #94a3b8 !important; font-size: 0.78rem !important; letter-spacing: 1px !important; text-transform: uppercase !important; }
+/* SELECTBOXES */
+.stSelectbox > div > div {
+    background: rgba(255,255,255,0.08) !important;
+    border-color: rgba(200,168,75,0.35) !important;
+    color: #f1f5f9 !important;
+    border-radius: 8px !important;
+}
+.stSelectbox label { color: #94a3b8 !important; font-size: 0.78rem !important; letter-spacing: 1px !important; text-transform: uppercase !important; }
+
+/* RADIO */
+.stRadio > div { gap: 6px !important; }
+.stRadio label {
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important;
+    padding: 12px 16px !important;
+    color: #f1f5f9 !important;
+    transition: all 0.2s !important;
+    cursor: pointer;
+}
+.stRadio label:hover { background: rgba(37,99,235,0.1) !important; border-color: rgba(37,99,235,0.3) !important; }
+
+/* BOTÕES */
+.stButton > button {
+    background: linear-gradient(135deg, #1e40af, #2563eb) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    letter-spacing: 1px !important;
+    text-transform: uppercase !important;
+    font-size: 0.78rem !important;
+    padding: 10px 20px !important;
+    transition: all 0.2s !important;
+    box-shadow: 0 4px 15px rgba(37,99,235,0.3) !important;
+}
+.stButton > button:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 20px rgba(37,99,235,0.45) !important;
+}
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #854d0e, #c8a84b) !important;
+    box-shadow: 0 4px 15px rgba(200,168,75,0.3) !important;
+}
+
+/* EXPANDER */
+.streamlit-expanderHeader {
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important;
+    color: #94a3b8 !important;
+}
+.streamlit-expanderContent {
+    background: rgba(255,255,255,0.02) !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+}
+
+/* DIVIDER */
+hr { border-color: rgba(200,168,75,0.15) !important; margin: 20px 0 !important; }
+
+/* LOGIN */
+.login-wrapper {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 60px 20px 40px 20px;
+}
+.login-escudo {
+    font-size: 72px; margin-bottom: 8px; filter: drop-shadow(0 0 20px rgba(200,168,75,0.4));
+}
+.login-titulo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3.5rem;
+    letter-spacing: 8px;
+    background: linear-gradient(135deg, #c8a84b, #f0d078, #c8a84b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-align: center;
+    line-height: 1;
+    margin: 0;
+}
+.login-subtitulo {
+    font-size: 0.78rem;
+    letter-spacing: 4px;
+    color: #64748b;
+    text-transform: uppercase;
+    text-align: center;
+    margin-top: 4px;
+    margin-bottom: 32px;
+}
+.login-card {
+    background: rgba(20,40,80,0.92);
+    border: 1px solid rgba(200,168,75,0.2);
+    border-radius: 16px;
+    padding: 32px 36px;
+    width: 100%;
+    max-width: 400px;
+    backdrop-filter: blur(10px);
+}
+
+/* BARRA DE PROGRESSO CUSTOMIZADA */
+.barra-container { margin: 6px 0 16px 0; }
+.barra-label {
+    display: flex; justify-content: space-between;
+    font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px;
+}
+.barra-track {
+    width: 100%; height: 8px; background: rgba(255,255,255,0.06);
+    border-radius: 100px; overflow: hidden;
+}
+.barra-fill {
+    height: 100%; border-radius: 100px;
+    background: linear-gradient(90deg, #1d4ed8, #3b82f6);
+    transition: width 0.6s ease;
+}
+.barra-fill.alta { background: linear-gradient(90deg, #15803d, #22c55e); }
+.barra-fill.media { background: linear-gradient(90deg, #b45309, #f59e0b); }
+
+/* BTN WHATSAPP */
+.btn-whatsapp {
+    display: block; width: 100%;
+    background: linear-gradient(135deg, #128C7E, #25D366);
+    color: white !important;
+    text-align: center; padding: 13px; border-radius: 10px;
+    text-decoration: none; font-weight: 700;
+    margin-top: 16px; letter-spacing: 1px; font-size: 0.85rem;
+    box-shadow: 0 4px 15px rgba(37,211,102,0.25);
+    transition: 0.3s; text-transform: uppercase;
+}
+.btn-whatsapp:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(37,211,102,0.4); }
+
+/* ÍCONES DECORATIVOS */
+.icon-strip {
+    display: flex; gap: 6px; font-size: 1.1rem;
+    justify-content: center; margin: 8px 0;
+    opacity: 0.5;
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #06111e; }
+::-webkit-scrollbar-thumb { background: rgba(200,168,75,0.3); border-radius: 3px; }
+</style>
 """, unsafe_allow_html=True)
 
-URL_BRASAO = "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Bras%C3%A3o_da_PMMG.svg/1200px-Bras%C3%A3o_da_PMMG.svg.png"
-
-# CONEXÃO
+# ─── CONEXÃO ────────────────────────────────────
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     MINHA_URL = st.secrets["connections"]["gsheets"]["spreadsheet"]
@@ -41,53 +356,48 @@ except Exception as e:
     st.error("⚠️ Erro nos Secrets (.streamlit/secrets.toml)")
     st.stop()
 
-# --- FUNÇÃO DE LIMPEZA CIRÚRGICA ANTIDUPLICIDADE ---
+# ─── HELPERS ────────────────────────────────────
 def limpar_dados(df):
-    if df is None or df.empty: return pd.DataFrame()
-    colunas_limpas = [str(c).strip() for c in df.columns]
-    colunas_sem_duplicidade = []
-    contagem = {}
-    for c in colunas_limpas:
-        if c in contagem:
-            contagem[c] += 1
-            colunas_sem_duplicidade.append(f"{c}_{contagem[c]}")
+    if df is None or df.empty:
+        return pd.DataFrame()
+    colunas = [str(c).strip() for c in df.columns]
+    vistos = {}
+    novas = []
+    for c in colunas:
+        if c in vistos:
+            vistos[c] += 1
+            novas.append(f"{c}_{vistos[c]}")
         else:
-            contagem[c] = 0
-            colunas_sem_duplicidade.append(c)
-    df.columns = colunas_sem_duplicidade
+            vistos[c] = 0
+            novas.append(c)
+    df.columns = novas
     for col in df.columns:
         if df[col].dtype == "object":
             df[col] = df[col].astype(str).str.strip()
     return df
 
-# --- FUNÇÕES DE BANCO E CALLBACKS ---
 def registrar_log(aba, dados):
     try:
         df_atual = conn.read(spreadsheet=MINHA_URL, worksheet=aba, ttl=0)
         df_novo = pd.concat([df_atual, pd.DataFrame([dados])], ignore_index=True)
         conn.update(spreadsheet=MINHA_URL, worksheet=aba, data=df_novo)
-        st.cache_data.clear() # Limpa a memória para forçar atualização
+        st.cache_data.clear()
     except Exception as e:
         st.error(f"Erro ao salvar: {e}")
 
-# CALLBACK: Executa instantaneamente sem quebrar a posição da tela
 def validar_questao_callback(q_id, radio_key, ops, gabarito, explicacao, pegadinha, materia, topico, usuario):
     escolha = st.session_state[radio_key]
     letra = [l for l, t in ops.items() if t == escolha][0]
     status = "Acerto" if letra == str(gabarito).strip().upper() else "Erro"
-    
-    # Salva no banco
     registrar_log("Log_Progresso", {
-        "Usuario": usuario, "Materia": materia, 
-        "Titulo": topico, "Questao": q_id, 
+        "Usuario": usuario, "Materia": materia,
+        "Titulo": topico, "Questao": q_id,
         "Status": status, "Data": datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
     })
-    
-    # Salva na memória de curto prazo (Sessão)
     st.session_state[f"status_q_{q_id}"] = status
-    st.session_state[f"gab_q_{q_id}"] = gabarito
-    st.session_state[f"exp_q_{q_id}"] = explicacao
-    st.session_state[f"pega_q_{q_id}"] = pegadinha
+    st.session_state[f"gab_q_{q_id}"]    = gabarito
+    st.session_state[f"exp_q_{q_id}"]    = explicacao
+    st.session_state[f"pega_q_{q_id}"]   = pegadinha
 
 def reset_materia(usuario, materia_alvo):
     try:
@@ -95,270 +405,488 @@ def reset_materia(usuario, materia_alvo):
             df = conn.read(spreadsheet=MINHA_URL, worksheet=aba, ttl="10m")
             df_n = limpar_dados(df)
             col_usu = next((c for c in df_n.columns if 'usuario' in c.lower()), df_n.columns[0])
-            col_mat = next((c for c in df_n.columns if 'materia' in c.lower() or 'mat' in c.lower()), df_n.columns[1])
-            
+            col_mat = next((c for c in df_n.columns if 'materia' in c.lower()), df_n.columns[1])
             mask = ~((df_n[col_usu].str.lower() == usuario.lower()) & (df_n[col_mat] == materia_alvo))
             conn.update(spreadsheet=MINHA_URL, worksheet=aba, data=df[mask])
-            
         st.cache_data.clear()
-        st.success(f"Progresso de '{materia_alvo}' foi zerado!")
-        time.sleep(1.5); st.rerun()
-    except Exception as e: st.error(f"Erro no Reset: {e}")
+        st.success(f"✅ Progresso de '{materia_alvo}' zerado com sucesso!")
+        time.sleep(1.5)
+        st.rerun()
+    except Exception as e:
+        st.error(f"Erro no Reset: {e}")
 
-if 'autenticado' not in st.session_state: st.session_state.autenticado = False
+def barra_progresso(label, valor, maximo, classe=""):
+    pct = min(100, int((valor / maximo * 100))) if maximo > 0 else 0
+    cor = "alta" if pct >= 70 else ("media" if pct >= 40 else "")
+    return f"""
+    <div class="barra-container">
+        <div class="barra-label"><span>{label}</span><span>{valor}/{maximo} ({pct}%)</span></div>
+        <div class="barra-track"><div class="barra-fill {cor}" style="width:{pct}%"></div></div>
+    </div>"""
 
-# --- LOGIN ---
+# ─── SESSION STATE ───────────────────────────────
+if 'autenticado' not in st.session_state:
+    st.session_state.autenticado = False
+
+# ══════════════════════════════════════════════════
+#  TELA DE LOGIN
+# ══════════════════════════════════════════════════
 if not st.session_state.autenticado:
-    st.markdown('<div style="text-align:center; padding-top: 50px;">', unsafe_allow_html=True)
-    st.image(URL_BRASAO, width=120)
-    st.title("ESTRATÉGIA GABARITO")
-    st.markdown("### 🎯 EAP 3º Sgt PM 2026")
-    
-    col_vazia1, col_form, col_vazia2 = st.columns([1, 1.5, 1])
-    
-    with col_form:
-        with st.form("login"):
-            u_input = st.text_input("Usuário ou E-mail:").strip().lower()
-            p_input = st.text_input("Senha:", type="password").strip()
-            submit = st.form_submit_button("INICIAR MISSÃO", use_container_width=True)
-            
+    st.markdown("""
+    <div class="login-wrapper">
+        <div class="login-escudo">🎯</div>
+        <p class="login-titulo">CONSTANCY</p>
+        <p class="login-subtitulo">EAP · 3º Sgt PM · 2026 · Banca CRS</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_l, col_c, col_r = st.columns([1, 1.2, 1])
+    with col_c:
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        st.markdown('<div class="icon-strip">⚔️ 🛡️ 🏆</div>', unsafe_allow_html=True)
+
+        with st.form("login_form"):
+            u_input = st.text_input("Usuário ou E-mail").strip().lower()
+            p_input = st.text_input("Senha", type="password").strip()
+            submit  = st.form_submit_button("▶  Iniciar Missão", use_container_width=True)
+
             if submit:
                 df_u = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Usuarios", ttl="10m"))
                 if not df_u.empty:
                     col_usu = next((c for c in df_u.columns if 'usuario' in c.lower()), df_u.columns[0])
                     col_sen = next((c for c in df_u.columns if 'senha' in c.lower()), df_u.columns[1])
                     col_val = next((c for c in df_u.columns if 'validade' in c.lower() or 'expiracao' in c.lower()), None)
-                    
                     user_row = df_u[df_u[col_usu].str.lower() == u_input]
-                    
                     if not user_row.empty and str(user_row.iloc[0][col_sen]) == p_input:
-                        acesso_liberado = True
-                        if col_val is not None:
-                            data_limite_str = str(user_row.iloc[0][col_val]).strip()
-                            if data_limite_str and data_limite_str.lower() not in ['nan', 'none', '']:
+                        acesso_ok = True
+                        if col_val:
+                            lim_str = str(user_row.iloc[0][col_val]).strip()
+                            if lim_str.lower() not in ['nan', 'none', '']:
                                 try:
-                                    data_limite = datetime.datetime.strptime(data_limite_str, "%d/%m/%Y").date()
-                                    if datetime.date.today() > data_limite:
-                                        acesso_liberado = False
+                                    lim = datetime.datetime.strptime(lim_str, "%d/%m/%Y").date()
+                                    if datetime.date.today() > lim:
+                                        acesso_ok = False
                                 except ValueError:
-                                    pass 
-                        
-                        if acesso_liberado:
-                            st.cache_data.clear() # Limpa a memória para garantir dados frescos no login
+                                    # Tenta formato ISO (vindo de planilha)
+                                    try:
+                                        lim = pd.to_datetime(lim_str).date()
+                                        if datetime.date.today() > lim:
+                                            acesso_ok = False
+                                    except Exception:
+                                        pass
+                        if acesso_ok:
+                            st.cache_data.clear()
                             st.session_state.autenticado = True
                             st.session_state.usuario = u_input
                             st.rerun()
                         else:
-                            st.error("⏳ SEU TESTE GRÁTIS EXPIROU!")
-                            st.warning("O seu tempo de missão acabou. Adquira o acesso definitivo e continue sua preparação para o EAP 2026!")
-                    else: 
-                        st.error("❌ Acesso Negado. Verifique os dados inseridos.")
+                            st.error("⏳ Acesso expirado. Renove seu plano.")
+                    else:
+                        st.error("❌ Usuário ou senha inválidos.")
 
-        # --- BOTÃO DO WHATSAPP ---
-        NUMERO_WHATSAPP = "5535999999999"  # <--- COLOCAR SEU NÚMERO AQUI
-        MENSAGEM_WHATSAPP = "Olá! Tenho interesse em adquirir o acesso definitivo ao aplicativo Questões EAP 3º Sgt PM 2026."
-        url_whatsapp = f"https://wa.me/{NUMERO_WHATSAPP}?text={MENSAGEM_WHATSAPP.replace(' ', '%20')}"
-        
+        # WhatsApp
+        NUM = "5535999999999"
+        MSG = "Olá! Quero adquirir o acesso ao CONSTANCY — EAP 3º Sgt PM 2026."
         st.markdown(f"""
-            <a href="{url_whatsapp}" target="_blank" class="btn-whatsapp">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" width="22" style="vertical-align: middle; margin-right: 8px;">
-                Adquira seu Acesso / Suporte
-            </a>
-        """, unsafe_allow_html=True)
-        
+        <a href="https://wa.me/{NUM}?text={MSG.replace(' ','%20')}" target="_blank" class="btn-whatsapp">
+            💬  Adquirir Acesso / Suporte
+        </a>""", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# --- CARREGA HISTÓRICOS ---
-df_hist_q = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Log_Progresso", ttl="10m"))
-df_hist_a = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Assuntos_Estudados", ttl="10m"))
+# ══════════════════════════════════════════════════
+#  DADOS GLOBAIS DO USUÁRIO
+# ══════════════════════════════════════════════════
+df_hist_q = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Log_Progresso",   ttl="5m"))
+df_hist_a = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Assuntos_Estudados", ttl="5m"))
 
-# --- NAVEGAÇÃO ---
-st.sidebar.image(URL_BRASAO, width=80)
-st.sidebar.markdown(f"### 🎖️ Combatente: {st.session_state.usuario.split('@')[0].upper()}")
-menu = st.sidebar.radio("Quartel General:", ["📝 Simulado", "📊 Performance", "🚪 Sair"])
+nome_exibir = st.session_state.usuario.split('@')[0].upper()
 
-if menu == "🚪 Sair":
+# ══════════════════════════════════════════════════
+#  SIDEBAR
+# ══════════════════════════════════════════════════
+with st.sidebar:
+    st.markdown(f"""
+    <div class="brand-header">
+        <p class="brand-title">CONSTANCY</p>
+        <p class="brand-sub">EAP · 3º Sgt PM · 2026</p>
+    </div>
+    <div style="text-align:center; padding: 10px 0 16px 0;">
+        <div style="font-size:2rem;">🎖️</div>
+        <div style="font-size:0.78rem; color:#c8a84b; font-weight:700; letter-spacing:2px;">{nome_exibir}</div>
+        <div style="font-size:0.65rem; color:#475569; margin-top:2px;">COMBATENTE · BANCA CRS</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    menu = st.radio(
+        "Navegação:",
+        ["📝  Simulado", "📊  Performance", "📚  Teoria", "🚪  Sair"],
+        label_visibility="collapsed"
+    )
+
+    # Stats rápidas no rodapé da sidebar
+    if not df_hist_q.empty:
+        col_u = next((c for c in df_hist_q.columns if 'usuario' in c.lower()), df_hist_q.columns[0])
+        col_s = next((c for c in df_hist_q.columns if 'status' in c.lower()), df_hist_q.columns[4])
+        meu = df_hist_q[df_hist_q[col_u].str.lower() == st.session_state.usuario]
+        total = len(meu)
+        acertos = len(meu[meu[col_s] == 'Acerto'])
+        taxa = round(acertos / total * 100, 1) if total > 0 else 0
+        st.markdown(f"""
+        <div style="border-top:1px solid rgba(200,168,75,0.2); margin-top:16px; padding-top:16px;">
+          <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">
+            <span>Progresso Geral</span>
+          </div>
+          {barra_progresso("Questões feitas", total, total+1 if total==0 else total, "")}
+          <div style="text-align:center; font-family:'Bebas Neue',sans-serif; font-size:1.6rem; color:#c8a84b; letter-spacing:2px; margin-top:8px;">{taxa}%</div>
+          <div style="text-align:center; font-size:0.65rem; color:#475569; letter-spacing:2px;">TAXA DE ACERTO</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+if menu == "🚪  Sair":
     st.session_state.autenticado = False
     st.cache_data.clear()
     st.rerun()
 
-# --- SIMULADO ---
-if menu == "📝 Simulado":
-    area = st.sidebar.selectbox("Área do Edital:", ["Legislacao_Institucional", "Doutrina_Operacional", "Legislacao_Juridica"])
+# ══════════════════════════════════════════════════
+#  PÁGINA: SIMULADO
+# ══════════════════════════════════════════════════
+if menu == "📝  Simulado":
+
+    st.markdown('<p class="secao-titulo">⚔️  CAMPO DE TREINAMENTO</p>', unsafe_allow_html=True)
+
+    area = st.selectbox(
+        "Área do Edital",
+        ["Legislacao_Institucional", "Doutrina_Operacional", "Legislacao_Juridica"],
+        format_func=lambda x: {
+            "Legislacao_Institucional": "🏛️  Legislação Institucional",
+            "Doutrina_Operacional":     "🎯  Doutrina Operacional",
+            "Legislacao_Juridica":      "⚖️  Legislação Jurídica"
+        }[x]
+    )
+
     try:
         df_q = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet=area, ttl="10m"))
-        if not df_q.empty:
-            while df_q.shape[1] < 13:
-                df_q[f"coluna_{df_q.shape[1]}"] = ""
+        if df_q.empty:
+            st.warning("Nenhuma questão encontrada nesta área.")
+            st.stop()
 
-            col_id = df_q.columns[0]; col_pergunta = df_q.columns[3]; col_gab = df_q.columns[8]
-            col_exp = df_q.columns[9]; col_pega = df_q.columns[10]
-            col_mat = df_q.columns[11]; col_topico = df_q.columns[12]
-            
-            leis = sorted([x for x in df_q[col_mat].unique() if str(x).lower() not in ['nan', '']])
-            sel_lei = st.selectbox("🎯 Disciplina:", leis)
-            df_f_lei = df_q[df_q[col_mat] == sel_lei]
-            
-            titulos = sorted([x for x in df_f_lei[col_topico].unique() if str(x).lower() not in ['nan', '']])
-            sel_titulo = st.selectbox("📖 Tópico:", ["VER TUDO"] + titulos)
+        # Garante colunas suficientes
+        while df_q.shape[1] < 13:
+            df_q[f"coluna_{df_q.shape[1]}"] = ""
 
-            if sel_titulo != "VER TUDO":
-                id_a = f"{sel_lei} - {sel_titulo}"
-                ja_estudado = False
-                if not df_hist_a.empty:
-                    col_usu_a = next((c for c in df_hist_a.columns if 'usuario' in c.lower()), df_hist_a.columns[0])
-                    col_topicos = [c for c in df_hist_a.columns if 'topico' in c.lower()]
-                    df_user_a = df_hist_a[df_hist_a[col_usu_a].str.lower() == st.session_state.usuario]
-                    
-                    for c in col_topicos:
-                        # Extrai e limpa os tópicos do banco para evitar falsos negativos
-                        topicos_salvos = [str(x).strip() for x in df_user_a[c].tolist()]
-                        if id_a.strip() in topicos_salvos:
-                            ja_estudado = True
-                            break
-                
-                if ja_estudado:
-                    st.success("✅ Tópico já marcado como ESTUDADO.")
-                else:
-                    if st.button("🏁 Marcar Tópico como Estudado", use_container_width=True):
-                        registrar_log("Assuntos_Estudados", {"Usuario": st.session_state.usuario, "Materia": sel_lei, "Topico": id_a, "Status": "Concluído", "Data": datetime.datetime.now().strftime("%d/%m/%Y")})
-                        st.cache_data.clear()
-                        st.rerun()
-            st.divider()
+        col_id, col_pergunta, col_gab = df_q.columns[0], df_q.columns[3], df_q.columns[8]
+        col_exp, col_pega, col_mat    = df_q.columns[9], df_q.columns[10], df_q.columns[11]
+        col_topico                    = df_q.columns[12]
 
-            df_exibir = df_f_lei if sel_titulo == "VER TUDO" else df_f_lei[df_f_lei[col_topico] == sel_titulo]
+        leis = sorted([x for x in df_q[col_mat].unique() if str(x).lower() not in ['nan', '']])
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            sel_lei = st.selectbox("Disciplina", leis)
+        df_f = df_q[df_q[col_mat] == sel_lei]
 
-            # BLINDAGEM DE DADOS: Assegura que o ID da questão salva seja lido como Texto sem decimais
-            minhas_q_banco = []
-            if not df_hist_q.empty:
-                col_usu_hist = next((c for c in df_hist_q.columns if 'usuario' in c.lower()), df_hist_q.columns[0])
-                col_q_hist = next((c for c in df_hist_q.columns if 'questao' in c.lower()), df_hist_q.columns[3])
-                
-                # Transforma "1.0" em "1", garantindo a checagem correta
-                minhas_q_banco = [str(x).split('.')[0].strip() for x in df_hist_q[df_hist_q[col_usu_hist].str.lower() == st.session_state.usuario][col_q_hist].tolist()]
+        titulos = sorted([x for x in df_f[col_topico].unique() if str(x).lower() not in ['nan', '']])
+        with c2:
+            sel_titulo = st.selectbox("Tópico", ["📋  VER TODOS"] + titulos)
 
-            for i, row in df_exibir.iterrows():
-                # Transforma o ID atual em texto limpo sem decimais também
-                q_id = str(row[col_id]).split('.')[0].strip()
-                
-                feita_banco = q_id in minhas_q_banco
-                feita_agora = f"status_q_{q_id}" in st.session_state
-                ja_resolvida = feita_banco or feita_agora
-                
-                badge = '<span class="status-badge concluido">RESOLVIDA</span>' if ja_resolvida else '<span class="status-badge pendente">PENDENTE</span>'
-                
-                with st.container():
-                    st.markdown(f'<div class="question-box"><b>Q{q_id}</b> {badge}<br><br>{row[col_pergunta]}</div>', unsafe_allow_html=True)
-                    ops = {"A": row.iloc[4], "B": row.iloc[5], "C": row.iloc[6], "D": row.iloc[7]}
-                    opcoes_validas = [v for v in ops.values() if str(v).lower() != 'nan' and str(v).strip() != '']
-                    
-                    escolha = st.radio(f"Res Q{q_id}:", opcoes_validas, key=f"r_{q_id}", label_visibility="collapsed", disabled=ja_resolvida)
-                    
-                    if not ja_resolvida:
-                        topico_log = row[col_topico] if sel_titulo == "VER TUDO" else sel_titulo
-                        st.button(f"Validar Q{q_id}", key=f"b_{q_id}", use_container_width=True, 
-                                  on_click=validar_questao_callback, 
-                                  args=(q_id, f"r_{q_id}", ops, row[col_gab], row[col_exp], row[col_pega], sel_lei, topico_log, st.session_state.usuario))
+        # Marcar tópico como estudado
+        if sel_titulo != "📋  VER TODOS":
+            id_a = f"{sel_lei} - {sel_titulo}"
+            ja_estudado = False
+            if not df_hist_a.empty:
+                col_usu_a = next((c for c in df_hist_a.columns if 'usuario' in c.lower()), df_hist_a.columns[0])
+                col_tops  = [c for c in df_hist_a.columns if 'topico' in c.lower()]
+                df_user_a = df_hist_a[df_hist_a[col_usu_a].str.lower() == st.session_state.usuario]
+                for c in col_tops:
+                    if id_a.strip() in [str(x).strip() for x in df_user_a[c].tolist()]:
+                        ja_estudado = True
+                        break
+
+            if ja_estudado:
+                st.markdown('<div class="feedback-box feedback-acerto">✅  Tópico marcado como <b>ESTUDADO</b> — bom trabalho, combatente!</div>', unsafe_allow_html=True)
+            else:
+                if st.button("🏁  Marcar Tópico como Estudado", use_container_width=False):
+                    registrar_log("Assuntos_Estudados", {
+                        "Usuario": st.session_state.usuario, "Materia": sel_lei,
+                        "Topico": id_a, "Status": "Concluído",
+                        "Data": datetime.datetime.now().strftime("%d/%m/%Y")
+                    })
+                    st.cache_data.clear()
+                    st.rerun()
+
+        st.divider()
+
+        df_exibir = df_f if sel_titulo == "📋  VER TODOS" else df_f[df_f[col_topico] == sel_titulo]
+
+        # IDs já resolvidos no banco
+        minhas_q_banco = []
+        if not df_hist_q.empty:
+            col_uhu = next((c for c in df_hist_q.columns if 'usuario' in c.lower()), df_hist_q.columns[0])
+            col_qhist = next((c for c in df_hist_q.columns if 'questao' in c.lower()), df_hist_q.columns[3])
+            minhas_q_banco = [str(x).split('.')[0].strip()
+                              for x in df_hist_q[df_hist_q[col_uhu].str.lower() == st.session_state.usuario][col_qhist].tolist()]
+
+        # Contador de questões
+        total_bloco   = len(df_exibir)
+        feitas_bloco  = sum(1 for _, r in df_exibir.iterrows()
+                            if str(r[col_id]).split('.')[0].strip() in minhas_q_banco
+                            or f"status_q_{str(r[col_id]).split('.')[0].strip()}" in st.session_state)
+
+        st.markdown(barra_progresso(
+            f"Progresso neste bloco",
+            feitas_bloco, total_bloco
+        ), unsafe_allow_html=True)
+
+        # ─── QUESTÕES ──────────────────────────────
+        for i, row in df_exibir.iterrows():
+            q_id = str(row[col_id]).split('.')[0].strip()
+            feita_banco = q_id in minhas_q_banco
+            feita_agora = f"status_q_{q_id}" in st.session_state
+            ja_resolvida = feita_banco or feita_agora
+
+            badge_html = (
+                '<span class="badge badge-resolvida">✓ Resolvida</span>'
+                if ja_resolvida else
+                '<span class="badge badge-pendente">○ Pendente</span>'
+            )
+            card_class = "card-questao resolvida" if ja_resolvida else "card-questao"
+
+            st.markdown(f"""
+            <div class="{card_class}">
+                <div class="q-numero">Q{q_id} {badge_html}</div>
+                <div class="q-texto">{row[col_pergunta]}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            ops = {"A": row.iloc[4], "B": row.iloc[5], "C": row.iloc[6], "D": row.iloc[7]}
+            opcoes = [v for v in ops.values() if str(v).lower() != 'nan' and str(v).strip() != '']
+
+            escolha = st.radio(
+                f"Resposta Q{q_id}:",
+                opcoes, key=f"r_{q_id}",
+                label_visibility="collapsed",
+                disabled=ja_resolvida
+            )
+
+            if not ja_resolvida:
+                topico_log = row[col_topico] if sel_titulo == "📋  VER TODOS" else sel_titulo
+                st.button(
+                    f"Validar Resposta — Q{q_id}", key=f"b_{q_id}",
+                    use_container_width=True,
+                    on_click=validar_questao_callback,
+                    args=(q_id, f"r_{q_id}", ops, row[col_gab], row[col_exp], row[col_pega], sel_lei, topico_log, st.session_state.usuario)
+                )
+            else:
+                if feita_agora:
+                    status = st.session_state[f"status_q_{q_id}"]
+                    if status == "Acerto":
+                        st.markdown('<div class="feedback-box feedback-acerto">🎯  ACERTOU! Excelente raciocínio tático.</div>', unsafe_allow_html=True)
                     else:
-                        if feita_agora:
-                            status = st.session_state[f"status_q_{q_id}"]
-                            if status == "Acerto": st.success("🎯 ACERTOU!")
-                            else: st.error(f"❌ ERROU! Gabarito: {st.session_state[f'gab_q_{q_id}']}")
-                            
-                            exp_texto = str(st.session_state[f"exp_q_{q_id}"]).strip()
-                            if exp_texto.lower() not in ['nan', 'none', '']: st.info(f"💡 **Comentário:** {exp_texto}")
-                                
-                            pega_texto = str(st.session_state[f"pega_q_{q_id}"]).strip()
-                            if pega_texto.lower() not in ['nan', 'none', '']: st.warning(f"🚨 **Pegadinha CRS:** {pega_texto}")
-                        else:
-                            st.success("✅ Questão já resolvida em treinamentos anteriores.")
-                            with st.expander("Ver Gabarito e Comentários"):
-                                st.write(f"**Gabarito Correto:** {row[col_gab]}")
-                                exp_texto = str(row[col_exp]).strip()
-                                if exp_texto.lower() not in ['nan', 'none', '']: st.info(f"💡 **Comentário:** {exp_texto}")
-                                pega_texto = str(row[col_pega]).strip()
-                                if pega_texto.lower() not in ['nan', 'none', '']: st.warning(f"🚨 **Pegadinha CRS:** {pega_texto}")
-                                
-    except Exception as e: st.error(f"Erro no Simulado: {e}")
+                        gab = st.session_state[f"gab_q_{q_id}"]
+                        st.markdown(f'<div class="feedback-box feedback-erro">❌  ERROU! Gabarito correto: <b>Alternativa {gab}</b></div>', unsafe_allow_html=True)
 
-# --- PERFORMANCE ---
-elif menu == "📊 Performance":
-    col_t1, col_t2 = st.columns([3, 1])
-    col_t1.title("📊 Inteligência de Performance")
-    
-    if col_t2.button("🔄 Atualizar Dados", use_container_width=True):
+                    exp = str(st.session_state[f"exp_q_{q_id}"]).strip()
+                    if exp.lower() not in ['nan', 'none', '']:
+                        st.markdown(f'<div class="feedback-box feedback-info">💡  <b>Comentário:</b> {exp}</div>', unsafe_allow_html=True)
+
+                    pega = str(st.session_state[f"pega_q_{q_id}"]).strip()
+                    if pega.lower() not in ['nan', 'none', '']:
+                        st.markdown(f'<div class="feedback-box feedback-warn">🚨  <b>Pegadinha CRS:</b> {pega}</div>', unsafe_allow_html=True)
+                else:
+                    with st.expander("Ver Gabarito e Comentários"):
+                        st.markdown(f"**Gabarito:** {row[col_gab]}")
+                        exp = str(row[col_exp]).strip()
+                        if exp.lower() not in ['nan', 'none', '']:
+                            st.markdown(f'<div class="feedback-box feedback-info">💡  {exp}</div>', unsafe_allow_html=True)
+                        pega = str(row[col_pega]).strip()
+                        if pega.lower() not in ['nan', 'none', '']:
+                            st.markdown(f'<div class="feedback-box feedback-warn">🚨  {pega}</div>', unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+    except Exception as e:
+        st.error(f"Erro no Simulado: {e}")
+
+
+# ══════════════════════════════════════════════════
+#  PÁGINA: PERFORMANCE
+# ══════════════════════════════════════════════════
+elif menu == "📊  Performance":
+    col_h1, col_h2 = st.columns([3, 1])
+    col_h1.markdown('<p class="secao-titulo">📊  INTELIGÊNCIA DE PERFORMANCE</p>', unsafe_allow_html=True)
+    if col_h2.button("🔄  Atualizar", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
-    
-    if not df_hist_q.empty:
-        col_usu_hist = next((c for c in df_hist_q.columns if 'usuario' in c.lower()), df_hist_q.columns[0])
-        meu_h = df_hist_q[df_hist_q[col_usu_hist].str.lower() == st.session_state.usuario].copy()
-        
-        if meu_h.empty:
-            st.warning("Nenhum dado sincronizado. Resolva questões e clique em 'Atualizar Dados'.")
+
+    if df_hist_q.empty:
+        st.info("Nenhum dado encontrado. Resolva questões para ver sua performance.")
+        st.stop()
+
+    col_uhu = next((c for c in df_hist_q.columns if 'usuario' in c.lower()), df_hist_q.columns[0])
+    meu_h = df_hist_q[df_hist_q[col_uhu].str.lower() == st.session_state.usuario].copy()
+
+    if meu_h.empty:
+        st.warning("Nenhum dado sincronizado. Resolva questões e atualize.")
+        st.stop()
+
+    col_s = next((c for c in meu_h.columns if 'status' in c.lower()), meu_h.columns[4])
+    acertos = len(meu_h[meu_h[col_s] == 'Acerto'])
+    total_q = len(meu_h)
+    taxa    = acertos / total_q * 100
+
+    # ─── MÉTRICAS ─────────────────────────────────
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown(f'<div class="metric-card"><div class="metric-valor">{total_q}</div><div class="metric-label">Questões Feitas</div></div>', unsafe_allow_html=True)
+    with c2:
+        st.markdown(f'<div class="metric-card"><div class="metric-valor">{acertos}</div><div class="metric-label">Acertos</div></div>', unsafe_allow_html=True)
+    with c3:
+        st.markdown(f'<div class="metric-card"><div class="metric-valor">{taxa:.1f}%</div><div class="metric-label">Taxa de Acerto</div></div>', unsafe_allow_html=True)
+    with c4:
+        status_op = "OPERACIONAL" if taxa >= 70 else "TREINAMENTO"
+        cor_op = "#4ade80" if taxa >= 70 else "#f59e0b"
+        st.markdown(f'<div class="metric-card"><div class="metric-valor" style="color:{cor_op};font-size:1.4rem;">{status_op}</div><div class="metric-label">Status</div></div>', unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ─── COBERTURA DO EDITAL ──────────────────────
+    st.markdown('<p class="secao-titulo" style="font-size:1.1rem;">🎯 Cobertura do Edital</p>', unsafe_allow_html=True)
+    areas = ["Legislacao_Institucional", "Doutrina_Operacional", "Legislacao_Juridica"]
+    banco_total = []
+    for a in areas:
+        df_t = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet=a, ttl="10m"))
+        if not df_t.empty:
+            while df_t.shape[1] < 12:
+                df_t[f"pad_{df_t.shape[1]}"] = ""
+            resumo = df_t.iloc[:, [0, 11]].copy()
+            resumo.columns = ['id_q', 'materia_q']
+            resumo = resumo[(resumo['materia_q'].str.lower() != 'nan') & (resumo['materia_q'] != '')]
+            banco_total.append(resumo)
+
+    if banco_total:
+        df_banco = pd.concat(banco_total)
+        total_mat = df_banco.groupby('materia_q').size().reset_index(name='Total')
+        col_m = next((c for c in meu_h.columns if 'materia' in c.lower()), meu_h.columns[1])
+        feito_mat = meu_h.groupby(col_m).size().reset_index(name='Feito')
+        df_p = pd.merge(total_mat, feito_mat, left_on='materia_q', right_on=col_m, how='left').fillna(0)
+        df_p['Perc'] = (df_p['Feito'] / df_p['Total']) * 100
+        df_p = df_p.sort_values('Perc', ascending=False)
+
+        # Barras HTML mais limpas
+        for _, rw in df_p.iterrows():
+            st.markdown(barra_progresso(rw['materia_q'], int(rw['Feito']), int(rw['Total'])), unsafe_allow_html=True)
+
+        # Gráfico radar/pizza para overview
+        fig_p = go.Figure()
+        fig_p.add_trace(go.Bar(
+            y=df_p['materia_q'], x=df_p['Perc'], orientation='h',
+            marker=dict(
+                color=df_p['Perc'],
+                colorscale=[[0, '#1e3a5f'], [0.5, '#2563eb'], [1, '#22c55e']],
+                showscale=False
+            ),
+            text=df_p['Perc'].apply(lambda x: f"<b>{x:.0f}%</b>"),
+            textposition='inside',
+            hovertemplate='%{y}: %{x:.1f}%<extra></extra>'
+        ))
+        fig_p.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+            height=max(300, len(df_p) * 38),
+            xaxis=dict(range=[0, 100], dtick=20, gridcolor='rgba(255,255,255,0.06)',
+                       tickfont=dict(color='#475569', size=11)),
+            yaxis=dict(tickfont=dict(color='#94a3b8', size=12)),
+            margin=dict(l=180, r=20, t=20, b=20),
+            font=dict(family='Inter')
+        )
+        st.plotly_chart(fig_p, use_container_width=True)
+
+    # ─── CONSTÂNCIA DIÁRIA ─────────────────────────
+    st.markdown('<p class="secao-titulo" style="font-size:1.1rem;">📅 Constância de Estudos</p>', unsafe_allow_html=True)
+    col_d = next((c for c in meu_h.columns if 'data' in c.lower()), meu_h.columns[5])
+    meu_h['Data_Limpa'] = pd.to_datetime(
+        meu_h[col_d].astype(str).str.strip().str[:10],
+        format='%d/%m/%Y', errors='coerce'
+    )
+    df_tempo = meu_h.dropna(subset=['Data_Limpa']).groupby('Data_Limpa').size().reset_index(name='Volume')
+    df_tempo = df_tempo.sort_values('Data_Limpa')
+    df_tempo['Dia'] = df_tempo['Data_Limpa'].dt.strftime('%d/%m')
+
+    fig_t = go.Figure()
+    fig_t.add_trace(go.Scatter(
+        x=df_tempo['Dia'], y=df_tempo['Volume'],
+        mode='lines+markers',
+        line=dict(color='#c8a84b', width=2.5),
+        marker=dict(size=7, color='#f0d078', line=dict(color='#854d0e', width=1.5)),
+        fill='tozeroy', fillcolor='rgba(200,168,75,0.08)',
+        hovertemplate='%{x}: <b>%{y} questões</b><extra></extra>'
+    ))
+    fig_t.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        height=250,
+        xaxis=dict(gridcolor='rgba(255,255,255,0.04)', tickfont=dict(color='#475569')),
+        yaxis=dict(gridcolor='rgba(255,255,255,0.04)', tickfont=dict(color='#475569')),
+        margin=dict(l=40, r=20, t=10, b=40),
+        font=dict(family='Inter')
+    )
+    st.plotly_chart(fig_t, use_container_width=True)
+
+    # ─── RESET ────────────────────────────────────
+    st.divider()
+    st.markdown('<p class="secao-titulo" style="font-size:1rem; color:#f87171;">🧹 Limpeza de Prontuário</p>', unsafe_allow_html=True)
+    mat_disp = df_p['materia_q'].unique() if 'df_p' in locals() else meu_h[col_m].unique()
+    m_reset = st.selectbox("Selecione a matéria para zerar:", mat_disp)
+    if st.button("⚠️  ZERAR HISTÓRICO DA MATÉRIA", type="primary"):
+        reset_materia(st.session_state.usuario, m_reset)
+
+
+# ══════════════════════════════════════════════════
+#  PÁGINA: TEORIA (nova!)
+# ══════════════════════════════════════════════════
+elif menu == "📚  Teoria":
+    st.markdown('<p class="secao-titulo">📚  BASE TEÓRICA — RESUMOS</p>', unsafe_allow_html=True)
+    try:
+        df_teoria = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Explicacoes_Teoria", ttl="10m"))
+        if df_teoria.empty:
+            st.info("Nenhum conteúdo teórico cadastrado ainda.")
         else:
-            col_status = next((c for c in meu_h.columns if 'status' in c.lower()), meu_h.columns[4])
-            acertos = len(meu_h[meu_h[col_status] == 'Acerto'])
-            total_q = len(meu_h)
-            
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Questões Resolvidas", total_q)
-            c2.metric("Taxa de Acerto", f"{(acertos/total_q*100):.1f}%")
-            c3.metric("Status Global", "OPERACIONAL" if (acertos/total_q) >= 0.7 else "TREINAMENTO")
+            # Colunas esperadas: Matéria, Capítulo_Artigo, Resumo_Teórico, Palavras_Chave, Referência_Edital
+            col_mat   = df_teoria.columns[0]
+            col_cap   = df_teoria.columns[1]
+            col_res   = df_teoria.columns[2]
+            col_palavras = df_teoria.columns[3] if df_teoria.shape[1] > 3 else None
+            col_ref   = df_teoria.columns[4] if df_teoria.shape[1] > 4 else None
 
-            st.subheader("🎯 Progresso no Edital (Cobertura 0-100%)")
-            
-            areas = ["Legislacao_Institucional", "Doutrina_Operacional", "Legislacao_Juridica"]
-            banco_total = []
-            for a in areas:
-                df_temp = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet=a, ttl="10m"))
-                if not df_temp.empty:
-                    while df_temp.shape[1] < 12: 
-                        df_temp[f"pad_{df_temp.shape[1]}"] = ""
-                    
-                    df_resumo = df_temp.iloc[:, [0, 11]].copy()
-                    df_resumo.columns = ['id_q', 'materia_q']
-                    df_resumo = df_resumo[(df_resumo['materia_q'].str.lower() != 'nan') & (df_resumo['materia_q'] != '')]
-                    banco_total.append(df_resumo)
-            
-            if banco_total:
-                df_banco = pd.concat(banco_total)
-                total_mat = df_banco.groupby('materia_q').size().reset_index(name='Total')
-                
-                col_mat_hist = next((c for c in meu_h.columns if 'materia' in c.lower() or 'mat' in c.lower()), meu_h.columns[1])
-                feito_mat = meu_h.groupby(col_mat_hist).size().reset_index(name='Feito')
-                
-                df_p = pd.merge(total_mat, feito_mat, left_on='materia_q', right_on=col_mat_hist, how='left').fillna(0)
-                df_p['Perc'] = (df_p['Feito'] / df_p['Total']) * 100
-                df_p['Resto'] = 100 - df_p['Perc']
-                df_p = df_p.sort_values('Perc', ascending=True)
+            materias = sorted([x for x in df_teoria[col_mat].unique() if str(x).lower() not in ['nan', '']])
+            sel_mat  = st.selectbox("Selecione a Matéria:", materias)
+            df_tf = df_teoria[df_teoria[col_mat] == sel_mat]
 
-                fig_p = go.Figure()
-                fig_p.add_trace(go.Bar(y=df_p['materia_q'], x=df_p['Perc'], orientation='h', marker_color='#28a745', name='Concluído', text=df_p['Perc'].apply(lambda x: f"<b>{x:.1f}%</b>"), textposition='inside'))
-                fig_p.add_trace(go.Bar(y=df_p['materia_q'], x=df_p['Resto'], orientation='h', marker_color='#e9ecef', name='Pendente', hoverinfo='none'))
-                
-                fig_p.update_layout(barmode='stack', showlegend=False, height=max(400, len(df_p)*40), xaxis=dict(range=[0, 100], dtick=10, title="Conclusão (%)"), yaxis=dict(title=""), template="plotly_white", margin=dict(l=200))
-                st.plotly_chart(fig_p, use_container_width=True)
+            for _, row in df_tf.iterrows():
+                cap = str(row[col_cap]).strip()
+                res = str(row[col_res]).strip()
+                if res.lower() in ['nan', 'none', '']:
+                    continue
 
-            st.subheader("📈 Constância de Estudos Diários")
-            col_data = next((c for c in meu_h.columns if 'data' in c.lower()), meu_h.columns[5])
-            
-            meu_h['Data_Limpa'] = pd.to_datetime(meu_h[col_data].astype(str).str.strip().str[:10], format='%d/%m/%Y', errors='coerce')
-            df_t = meu_h.dropna(subset=['Data_Limpa']).groupby('Data_Limpa').size().reset_index(name='Volume')
-            df_t = df_t.sort_values('Data_Limpa')
-            df_t['Dia_Mes'] = df_t['Data_Limpa'].dt.strftime('%d/%m/%Y')
-            
-            fig_t = px.area(df_t, x='Dia_Mes', y='Volume', markers=True)
-            fig_t.update_traces(line_color='#1e3a8a', fillcolor='rgba(30, 58, 138, 0.2)')
-            fig_t.update_layout(xaxis=dict(title="Dia da Missão", type='category'), yaxis_title="Qtd Questões", template="plotly_white")
-            st.plotly_chart(fig_t, use_container_width=True)
+                tags_html = ""
+                if col_palavras:
+                    palavras = str(row[col_palavras]).strip()
+                    if palavras.lower() not in ['nan', 'none', '']:
+                        for p in palavras.split(','):
+                            tags_html += f'<span style="background:rgba(37,99,235,0.15);color:#93c5fd;padding:2px 8px;border-radius:20px;font-size:0.72rem;margin-right:4px;">{p.strip()}</span>'
 
-            st.divider()
-            st.subheader("🧹 Limpeza de Prontuário")
-            mat_disponiveis = df_p['materia_q'].unique() if 'df_p' in locals() else meu_h[col_mat_hist].unique()
-            m_reset = st.selectbox("Selecione a matéria para zerar o progresso:", mat_disponiveis)
-            if st.button("ZERAR HISTÓRICO DA MATÉRIA", type="primary"): 
-                reset_materia(st.session_state.usuario, m_reset)
+                ref_html = ""
+                if col_ref:
+                    ref = str(row[col_ref]).strip()
+                    if ref.lower() not in ['nan', 'none', '']:
+                        ref_html = f'<div style="font-size:0.72rem;color:#c8a84b;margin-top:10px;">📌 Edital: {ref}</div>'
 
-    else:
-        st.info("Nenhum dado de progresso localizado no banco.")
+                st.markdown(f"""
+                <div class="card-questao" style="margin-bottom:14px;">
+                    <div class="q-numero">{cap}</div>
+                    <div class="q-texto" style="margin-top:8px;">{res}</div>
+                    <div style="margin-top:10px;">{tags_html}</div>
+                    {ref_html}
+                </div>
+                """, unsafe_allow_html=True)
+
+    except Exception as e:
+        st.error(f"Erro ao carregar teoria: {e}")
