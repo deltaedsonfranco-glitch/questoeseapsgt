@@ -8,18 +8,19 @@ import plotly.graph_objects as go
 # ═══════════════════════════════════════════════════════════════
 #  CONSTANCY — EAP 3º SGT PM 2026 | BANCA CRS | PMMG
 #
-#  LÓGICA DE RASTREAMENTO DE QUESTÕES (sem colisão):
+#  RASTREAMENTO SEM COLISÃO — sem precisar de coluna extra:
 #
-#  O Log_Progresso possui a coluna "Ref" = Materia + "_" + Questao
-#  Ex: "Direito Penal Militar_5" ou "EMEMG_81"
+#  A Ref é construída em tempo real: Materia + "_" + Questao
+#  Ex.: "Direito Penal Militar_5"  /  "EMEMG_81"
 #
-#  Como cada Materia é única em todo o banco (EMEMG só existe na
-#  Institucional, Direito Penal Militar só na Jurídica, etc.),
-#  a Ref é um identificador global sem nenhuma colisão possível.
+#  Isso funciona porque as colunas Materia e Questao já existem
+#  no Log_Progresso. Como cada Materia pertence a uma única aba
+#  (EMEMG só na Institucional, Direito Penal Militar só na
+#  Jurídica, etc.), a combinação é globalmente única — zero
+#  colisões, sem necessidade de criar coluna G na planilha.
 #
 #  O session_state também usa a Ref como chave:
 #  status_q_EMEMG_81  /  status_q_Direito Penal Militar_5
-#  → nunca confunde questões de abas diferentes.
 # ═══════════════════════════════════════════════════════════════
 
 st.set_page_config(
@@ -40,7 +41,6 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     background: linear-gradient(160deg, #0a1628 0%, #0f2040 40%, #0a1628 100%);
     min-height: 100vh;
 }
-
 .stApp p, .stApp span, .stApp div, .stApp li { color: #e2e8f0; }
 .stMarkdown, .stMarkdown p { color: #e2e8f0 !important; }
 
@@ -108,17 +108,11 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
 /* INPUTS — fundo branco, texto PRETO */
 .stTextInput > div > div > input,
-input[type="text"],
-input[type="password"],
-input[type="email"] {
-    background: #ffffff !important;
-    border: 1.5px solid #c8a84b !important;
-    border-radius: 8px !important;
-    color: #0f172a !important;
-    font-size: 0.95rem !important;
-    font-weight: 500 !important;
-    caret-color: #0f172a !important;
-    padding: 10px 14px !important;
+input[type="text"], input[type="password"], input[type="email"] {
+    background: #ffffff !important; border: 1.5px solid #c8a84b !important;
+    border-radius: 8px !important; color: #0f172a !important;
+    font-size: 0.95rem !important; font-weight: 500 !important;
+    caret-color: #0f172a !important; padding: 10px 14px !important;
 }
 input[type="text"]::placeholder, input[type="password"]::placeholder { color: #94a3b8 !important; }
 input { background: #ffffff !important; color: #0f172a !important; }
@@ -214,26 +208,39 @@ def limpar_dados(df):
 
 def montar_ref(materia, questao_id):
     """
-    Cria a chave de referência única: Materia_ID
+    Constrói o identificador único de uma questão: Materia_ID
     Ex.: 'Direito Penal Militar_5'  /  'EMEMG_81'
-    Essa chave é usada tanto no Log_Progresso (coluna Ref)
-    quanto nas chaves do session_state — sem nenhuma colisão
-    entre abas, pois cada Materia pertence a uma única aba.
+
+    Não precisa de coluna extra na planilha — é calculado em tempo
+    real a partir das colunas Materia e Questao que já existem.
+    Como cada Materia pertence exclusivamente a uma aba, a Ref
+    é globalmente única: zero colisões entre abas.
     """
     mat = str(materia).strip()
     qid = str(questao_id).split('.')[0].strip()
     return f"{mat}_{qid}"
 
 
-def registrar_log(dados):
-    """Salva uma linha no Log_Progresso incluindo a coluna Ref."""
+def salvar_log_progresso(dados):
+    """Salva uma linha de resposta no Log_Progresso."""
     try:
         df_atual = conn.read(spreadsheet=MINHA_URL, worksheet="Log_Progresso", ttl=0)
         df_novo  = pd.concat([df_atual, pd.DataFrame([dados])], ignore_index=True)
         conn.update(spreadsheet=MINHA_URL, worksheet="Log_Progresso", data=df_novo)
         st.cache_data.clear()
     except Exception as e:
-        st.error(f"Erro ao salvar: {e}")
+        st.error(f"Erro ao salvar progresso: {e}")
+
+
+def salvar_topico_estudado(dados):
+    """Salva um tópico marcado como estudado no Assuntos_Estudados."""
+    try:
+        df_atual = conn.read(spreadsheet=MINHA_URL, worksheet="Assuntos_Estudados", ttl=0)
+        df_novo  = pd.concat([df_atual, pd.DataFrame([dados])], ignore_index=True)
+        conn.update(spreadsheet=MINHA_URL, worksheet="Assuntos_Estudados", data=df_novo)
+        st.cache_data.clear()
+    except Exception as e:
+        st.error(f"Erro ao marcar tópico: {e}")
 
 
 def validar_questao_callback(ref, radio_key, ops, gabarito,
@@ -241,24 +248,24 @@ def validar_questao_callback(ref, radio_key, ops, gabarito,
                               questao_id, usuario):
     """
     Callback do botão Validar.
-    Grava no log com a coluna Ref = Materia_ID.
-    Salva resultado no session_state usando a mesma Ref como chave.
+    Grava no Log_Progresso usando as colunas existentes (sem coluna extra).
+    Usa a Ref no session_state para não confundir questões de abas diferentes.
     """
     escolha = st.session_state[radio_key]
     letra   = [l for l, t in ops.items() if t == escolha][0]
     status  = "Acerto" if letra == str(gabarito).strip().upper() else "Erro"
 
-    registrar_log({
+    # Grava apenas as colunas que já existem na planilha
+    salvar_log_progresso({
         "Usuario": usuario,
         "Materia": materia,
         "Titulo":  topico,
         "Questao": questao_id,
         "Status":  status,
         "Data":    datetime.datetime.now().strftime("%d/%m/%Y %H:%M"),
-        "Ref":     ref,          # ← coluna G: identificador sem colisão
     })
 
-    # Persiste na sessão atual usando a Ref como chave
+    # Persiste resultado na sessão usando Ref como chave única
     st.session_state[f"status_q_{ref}"] = status
     st.session_state[f"gab_q_{ref}"]    = gabarito
     st.session_state[f"exp_q_{ref}"]    = explicacao
@@ -324,9 +331,9 @@ if not st.session_state.autenticado:
             if submit:
                 df_u = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Usuarios", ttl="5m"))
                 if not df_u.empty:
-                    col_usu = next((c for c in df_u.columns if 'usuario'  in c.lower()), df_u.columns[0])
-                    col_sen = next((c for c in df_u.columns if 'senha'    in c.lower()), df_u.columns[1])
-                    col_val = next((c for c in df_u.columns if 'validade' in c.lower()
+                    col_usu = next((c for c in df_u.columns if 'usuario'   in c.lower()), df_u.columns[0])
+                    col_sen = next((c for c in df_u.columns if 'senha'     in c.lower()), df_u.columns[1])
+                    col_val = next((c for c in df_u.columns if 'validade'  in c.lower()
                                     or 'expiracao' in c.lower()), None)
                     user_row = df_u[df_u[col_usu].str.lower() == u_input]
 
@@ -371,25 +378,19 @@ df_hist_q = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Log_Progres
 df_hist_a = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Assuntos_Estudados", ttl="2m"))
 nome_exibir = st.session_state.usuario.split('@')[0].upper()
 
-# Pré-computa o conjunto de Refs já resolvidas pelo usuário atual
-# usando a coluna G (Ref = Materia_ID) — identificador sem colisão
+# ── Constrói o set de Refs resolvidas a partir das colunas existentes ──
+# Ref = Materia_Questao, calculado do Log_Progresso sem coluna extra.
+# Como Materia é única por aba, a Ref é globalmente única.
 refs_resolvidas_banco: set = set()
 if not df_hist_q.empty:
     col_u_g = next((c for c in df_hist_q.columns if 'usuario' in c.lower()), df_hist_q.columns[0])
+    col_m_g = next((c for c in df_hist_q.columns if 'materia' in c.lower()), df_hist_q.columns[1])
+    col_q_g = next((c for c in df_hist_q.columns if 'questao' in c.lower()), df_hist_q.columns[3])
     df_meu_g = df_hist_q[df_hist_q[col_u_g].str.lower() == st.session_state.usuario]
-
-    # Tenta usar a coluna Ref (col G) — disponível na planilha atualizada
-    if 'Ref' in df_meu_g.columns:
-        refs_resolvidas_banco = set(df_meu_g['Ref'].dropna().str.strip().tolist())
-    else:
-        # Fallback: reconstrói a Ref a partir de Materia + Questao
-        # para compatibilidade com logs antigos sem a coluna Ref
-        col_m_g = next((c for c in df_meu_g.columns if 'materia' in c.lower()), df_meu_g.columns[1])
-        col_q_g = next((c for c in df_meu_g.columns if 'questao' in c.lower()), df_meu_g.columns[3])
-        refs_resolvidas_banco = set(
-            montar_ref(row[col_m_g], row[col_q_g])
-            for _, row in df_meu_g.iterrows()
-        )
+    refs_resolvidas_banco = set(
+        montar_ref(row[col_m_g], row[col_q_g])
+        for _, row in df_meu_g.iterrows()
+    )
 
 
 # ════════════════════════════════════════════════════════════════
@@ -459,17 +460,16 @@ if menu == "📝  Simulado":
             st.warning("Nenhuma questão encontrada nesta área.")
             st.stop()
 
-        # Garante que há colunas suficientes
         while df_q.shape[1] < 13:
             df_q[f"coluna_{df_q.shape[1]}"] = ""
 
-        col_id       = df_q.columns[0]   # ID numérico da questão
+        col_id       = df_q.columns[0]   # ID numérico
         col_pergunta = df_q.columns[3]   # Enunciado
-        col_gab      = df_q.columns[8]   # Gabarito (A/B/C/D)
+        col_gab      = df_q.columns[8]   # Gabarito
         col_exp      = df_q.columns[9]   # Explicação
         col_pega     = df_q.columns[10]  # Pegadinha CRS
-        col_mat      = df_q.columns[11]  # Matéria (ex: "EMEMG", "Direito Penal Militar")
-        col_topico   = df_q.columns[12]  # Tópico/Título
+        col_mat      = df_q.columns[11]  # Matéria (ex: "EMEMG")
+        col_topico   = df_q.columns[12]  # Tópico
 
         leis = sorted([x for x in df_q[col_mat].unique() if str(x).lower() not in ['nan', '']])
         c1, c2 = st.columns(2)
@@ -498,25 +498,14 @@ if menu == "📝  Simulado":
                 st.markdown('<div class="feedback-box feedback-acerto">✅  Tópico marcado como <b>ESTUDADO</b> — bom trabalho, combatente!</div>', unsafe_allow_html=True)
             else:
                 if st.button("🏁  Marcar Tópico como Estudado"):
-                    registrar_log({   # reusa registrar_log mas grava em outra aba
+                    salvar_topico_estudado({
                         "Usuario": st.session_state.usuario,
                         "Materia": sel_lei,
                         "Topico":  id_topico,
                         "Status":  "Concluído",
                         "Data":    datetime.datetime.now().strftime("%d/%m/%Y")
                     })
-                    # Para esta operação específica usa a aba Assuntos_Estudados
-                    try:
-                        df_at = conn.read(spreadsheet=MINHA_URL, worksheet="Assuntos_Estudados", ttl=0)
-                        novo  = {"Usuario": st.session_state.usuario, "Materia": sel_lei,
-                                 "Topico": id_topico, "Status": "Concluído",
-                                 "Data": datetime.datetime.now().strftime("%d/%m/%Y")}
-                        conn.update(spreadsheet=MINHA_URL, worksheet="Assuntos_Estudados",
-                                    data=pd.concat([df_at, pd.DataFrame([novo])], ignore_index=True))
-                        st.cache_data.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao marcar tópico: {e}")
+                    st.rerun()
 
         st.divider()
 
@@ -533,8 +522,7 @@ if menu == "📝  Simulado":
 
         # ── Renderiza cada questão ──────────────────────────────
         for _, row in df_exibir.iterrows():
-            # ref é o identificador único global desta questão
-            ref = montar_ref(row[col_mat], row[col_id])
+            ref        = montar_ref(row[col_mat], row[col_id])
             q_id_limpo = str(row[col_id]).split('.')[0].strip()
 
             feita_banco  = ref in refs_resolvidas_banco
@@ -558,7 +546,6 @@ if menu == "📝  Simulado":
             ops    = {"A": row.iloc[4], "B": row.iloc[5], "C": row.iloc[6], "D": row.iloc[7]}
             opcoes = [v for v in ops.values() if str(v).lower() != 'nan' and str(v).strip() != '']
 
-            # Chave do widget usa a Ref — sem colisão entre abas
             st.radio(
                 f"Resposta Q{q_id_limpo}:",
                 opcoes,
@@ -636,7 +623,6 @@ elif menu == "📊  Performance":
     total_q = len(meu_h)
     taxa    = acertos / total_q * 100
 
-    # ── Métricas ────────────────────────────────────────────────
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.markdown(f'<div class="metric-card"><div class="metric-valor">{total_q}</div><div class="metric-label">Questões Feitas</div></div>', unsafe_allow_html=True)
@@ -651,7 +637,6 @@ elif menu == "📊  Performance":
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Cobertura do Edital ──────────────────────────────────────
     st.markdown('<p class="secao-titulo" style="font-size:1.1rem;">🎯 Cobertura do Edital</p>', unsafe_allow_html=True)
     banco_total = []
     for a in ["Legislacao_Institucional", "Doutrina_Operacional", "Legislacao_Juridica"]:
@@ -698,7 +683,6 @@ elif menu == "📊  Performance":
         )
         st.plotly_chart(fig_p, use_container_width=True)
 
-    # ── Constância diária ────────────────────────────────────────
     st.markdown('<p class="secao-titulo" style="font-size:1.1rem;">📅 Constância de Estudos</p>', unsafe_allow_html=True)
     col_d = next((c for c in meu_h.columns if 'data' in c.lower()), meu_h.columns[5])
     meu_h['Data_Limpa'] = pd.to_datetime(
@@ -728,7 +712,6 @@ elif menu == "📊  Performance":
     )
     st.plotly_chart(fig_t, use_container_width=True)
 
-    # ── Reset de matéria ─────────────────────────────────────────
     st.divider()
     st.markdown('<p class="secao-titulo" style="font-size:1rem; color:#f87171;">🧹 Limpeza de Prontuário</p>', unsafe_allow_html=True)
     col_m_reset = next((c for c in meu_h.columns if 'materia' in c.lower()), meu_h.columns[1])
