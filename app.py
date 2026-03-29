@@ -8,14 +8,18 @@ import plotly.graph_objects as go
 # ═══════════════════════════════════════════════════════════════
 #  CONSTANCY — EAP 3º SGT PM 2026 | BANCA CRS | PMMG
 #
-#  CORREÇÕES APLICADAS:
-#  [BUG 1] Chaves de session_state agora incluem prefixo da ABA
-#          ex: "status_q_Legislacao_Juridica__5"
-#          → impede que Q5 de uma aba marque Q5 de outra aba
-#  [BUG 2] minhas_q_banco filtra por aba (ou por matérias da aba)
-#          → impede que IDs iguais de abas diferentes colidam
-#  [BUG 3] ttl reduzido para "2m" nas leituras do simulado
-#          → questões novas aparecem sem precisar reiniciar
+#  LÓGICA DE RASTREAMENTO DE QUESTÕES (sem colisão):
+#
+#  O Log_Progresso possui a coluna "Ref" = Materia + "_" + Questao
+#  Ex: "Direito Penal Militar_5" ou "EMEMG_81"
+#
+#  Como cada Materia é única em todo o banco (EMEMG só existe na
+#  Institucional, Direito Penal Militar só na Jurídica, etc.),
+#  a Ref é um identificador global sem nenhuma colisão possível.
+#
+#  O session_state também usa a Ref como chave:
+#  status_q_EMEMG_81  /  status_q_Direito Penal Militar_5
+#  → nunca confunde questões de abas diferentes.
 # ═══════════════════════════════════════════════════════════════
 
 st.set_page_config(
@@ -30,25 +34,16 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
 
-:root {
-    --azul-claro: #2563eb;
-    --dourado:    #c8a84b;
-    --branco:     #f1f5f9;
-}
-
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-/* FUNDO GERAL */
 .stApp {
     background: linear-gradient(160deg, #0a1628 0%, #0f2040 40%, #0a1628 100%);
     min-height: 100vh;
 }
 
-/* TEXTO GLOBAL */
 .stApp p, .stApp span, .stApp div, .stApp li { color: #e2e8f0; }
 .stMarkdown, .stMarkdown p { color: #e2e8f0 !important; }
 
-/* SIDEBAR */
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg, #06111e 0%, #0d1f38 100%) !important;
     border-right: 1px solid rgba(200,168,75,0.25) !important;
@@ -59,7 +54,6 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 }
 [data-testid="stSidebar"] .stRadio label:hover { background: rgba(200,168,75,0.12) !important; }
 
-/* MARCA */
 .brand-header {
     text-align: center; padding: 10px 0 6px 0;
     border-bottom: 1px solid rgba(200,168,75,0.3); margin-bottom: 10px;
@@ -72,7 +66,6 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 }
 .brand-sub { font-size: 0.68rem; letter-spacing: 3px; color: #94a3b8 !important; text-transform: uppercase; margin-top: 2px; }
 
-/* CARDS QUESTÃO */
 .card-questao {
     background: rgba(20,40,80,0.92);
     border: 1px solid rgba(255,255,255,0.15);
@@ -89,27 +82,23 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 }
 .q-texto { font-size: 1rem !important; line-height: 1.75 !important; color: #f1f5f9 !important; font-weight: 400; }
 
-/* BADGES */
 .badge { display: inline-block; font-size: 0.65rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 3px 10px; border-radius: 20px; }
 .badge-pendente  { background: rgba(148,163,184,0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3); }
 .badge-resolvida { background: rgba(200,168,75,0.15);  color: #c8a84b; border: 1px solid rgba(200,168,75,0.35); }
 
-/* FEEDBACK */
 .feedback-box { border-radius: 10px; padding: 14px 18px; margin-top: 12px; font-size: 0.9rem; font-weight: 500; }
 .feedback-acerto { background: rgba(22,163,74,0.12);  border: 1px solid rgba(22,163,74,0.3);  color: #4ade80; }
 .feedback-erro   { background: rgba(220,38,38,0.10);  border: 1px solid rgba(220,38,38,0.3);  color: #f87171; }
 .feedback-info   { background: rgba(37,99,235,0.10);  border: 1px solid rgba(37,99,235,0.3);  color: #93c5fd; margin-top: 8px; }
 .feedback-warn   { background: rgba(234,179,8,0.10);  border: 1px solid rgba(234,179,8,0.3);  color: #fde047; margin-top: 8px; }
 
-/* MÉTRICAS */
 .metric-card {
     background: rgba(20,40,80,0.92); border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 14px; padding: 20px 24px; text-align: center; color: #f1f5f9;
+    border-radius: 14px; padding: 20px 24px; text-align: center;
 }
 .metric-valor { font-family: 'Bebas Neue', sans-serif; font-size: 2.8rem; letter-spacing: 2px; color: #c8a84b; line-height: 1; }
 .metric-label { font-size: 0.72rem; letter-spacing: 2px; color: #64748b; text-transform: uppercase; margin-top: 4px; }
 
-/* TÍTULOS DE SEÇÃO */
 .secao-titulo {
     font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem;
     letter-spacing: 3px; color: #f1f5f9;
@@ -117,7 +106,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     padding-bottom: 6px; margin: 24px 0 16px 0;
 }
 
-/* INPUTS — fundo branco, texto PRETO visível */
+/* INPUTS — fundo branco, texto PRETO */
 .stTextInput > div > div > input,
 input[type="text"],
 input[type="password"],
@@ -135,11 +124,9 @@ input[type="text"]::placeholder, input[type="password"]::placeholder { color: #9
 input { background: #ffffff !important; color: #0f172a !important; }
 .stTextInput label { color: #94a3b8 !important; font-size: 0.78rem !important; letter-spacing: 1px !important; text-transform: uppercase !important; }
 
-/* SELECTBOXES */
 .stSelectbox > div > div { background: rgba(255,255,255,0.08) !important; border-color: rgba(200,168,75,0.35) !important; color: #f1f5f9 !important; border-radius: 8px !important; }
 .stSelectbox label { color: #94a3b8 !important; font-size: 0.78rem !important; letter-spacing: 1px !important; text-transform: uppercase !important; }
 
-/* RADIO */
 .stRadio > div { gap: 6px !important; }
 .stRadio label {
     background: rgba(255,255,255,0.03) !important;
@@ -149,7 +136,6 @@ input { background: #ffffff !important; color: #0f172a !important; }
 }
 .stRadio label:hover { background: rgba(37,99,235,0.1) !important; border-color: rgba(37,99,235,0.3) !important; }
 
-/* BOTÕES */
 .stButton > button {
     background: linear-gradient(135deg, #1e40af, #2563eb) !important;
     color: white !important; border: none !important; border-radius: 8px !important;
@@ -160,18 +146,14 @@ input { background: #ffffff !important; color: #0f172a !important; }
 .stButton > button:hover { transform: translateY(-1px) !important; box-shadow: 0 6px 20px rgba(37,99,235,0.45) !important; }
 .stButton > button[kind="primary"] { background: linear-gradient(135deg, #854d0e, #c8a84b) !important; }
 
-/* EXPANDER */
 .streamlit-expanderHeader { background: rgba(255,255,255,0.03) !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 8px !important; color: #94a3b8 !important; }
 
-/* DIVIDER */
 hr { border-color: rgba(200,168,75,0.15) !important; margin: 20px 0 !important; }
 
-/* SCROLLBAR */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #06111e; }
 ::-webkit-scrollbar-thumb { background: rgba(200,168,75,0.3); border-radius: 3px; }
 
-/* LOGIN */
 .login-titulo {
     font-family: 'Bebas Neue', sans-serif; font-size: 3.5rem; letter-spacing: 8px;
     background: linear-gradient(135deg, #c8a84b, #f0d078, #c8a84b);
@@ -179,9 +161,8 @@ hr { border-color: rgba(200,168,75,0.15) !important; margin: 20px 0 !important; 
     background-clip: text; text-align: center; line-height: 1; margin: 0;
 }
 .login-subtitulo { font-size: 0.78rem; letter-spacing: 4px; color: #64748b; text-transform: uppercase; text-align: center; margin-top: 4px; margin-bottom: 32px; }
-.login-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(200,168,75,0.2); border-radius: 16px; padding: 32px 36px; width: 100%; max-width: 400px; backdrop-filter: blur(10px); }
+.login-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(200,168,75,0.2); border-radius: 16px; padding: 32px 36px; backdrop-filter: blur(10px); }
 
-/* BARRAS DE PROGRESSO */
 .barra-container { margin: 6px 0 16px 0; }
 .barra-label { display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; }
 .barra-track { width: 100%; height: 8px; background: rgba(255,255,255,0.06); border-radius: 100px; overflow: hidden; }
@@ -189,7 +170,6 @@ hr { border-color: rgba(200,168,75,0.15) !important; margin: 20px 0 !important; 
 .barra-fill.alta  { background: linear-gradient(90deg, #15803d, #22c55e); }
 .barra-fill.media { background: linear-gradient(90deg, #b45309, #f59e0b); }
 
-/* WHATSAPP */
 .btn-whatsapp {
     display: block; width: 100%; background: linear-gradient(135deg, #128C7E, #25D366);
     color: white !important; text-align: center; padding: 13px; border-radius: 10px;
@@ -199,6 +179,7 @@ hr { border-color: rgba(200,168,75,0.15) !important; margin: 20px 0 !important; 
 .btn-whatsapp:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(37,211,102,0.4); }
 </style>
 """, unsafe_allow_html=True)
+
 
 # ─── CONEXÃO ────────────────────────────────────────────────────
 try:
@@ -212,7 +193,7 @@ except Exception:
 # ─── FUNÇÕES UTILITÁRIAS ─────────────────────────────────────────
 
 def limpar_dados(df):
-    """Normaliza colunas duplicadas e remove espaços."""
+    """Normaliza nomes de colunas duplicadas e remove espaços em strings."""
     if df is None or df.empty:
         return pd.DataFrame()
     colunas = [str(c).strip() for c in df.columns]
@@ -231,50 +212,61 @@ def limpar_dados(df):
     return df
 
 
-def registrar_log(aba, dados):
+def montar_ref(materia, questao_id):
+    """
+    Cria a chave de referência única: Materia_ID
+    Ex.: 'Direito Penal Militar_5'  /  'EMEMG_81'
+    Essa chave é usada tanto no Log_Progresso (coluna Ref)
+    quanto nas chaves do session_state — sem nenhuma colisão
+    entre abas, pois cada Materia pertence a uma única aba.
+    """
+    mat = str(materia).strip()
+    qid = str(questao_id).split('.')[0].strip()
+    return f"{mat}_{qid}"
+
+
+def registrar_log(dados):
+    """Salva uma linha no Log_Progresso incluindo a coluna Ref."""
     try:
-        df_atual = conn.read(spreadsheet=MINHA_URL, worksheet=aba, ttl=0)
+        df_atual = conn.read(spreadsheet=MINHA_URL, worksheet="Log_Progresso", ttl=0)
         df_novo  = pd.concat([df_atual, pd.DataFrame([dados])], ignore_index=True)
-        conn.update(spreadsheet=MINHA_URL, worksheet=aba, data=df_novo)
+        conn.update(spreadsheet=MINHA_URL, worksheet="Log_Progresso", data=df_novo)
         st.cache_data.clear()
     except Exception as e:
         st.error(f"Erro ao salvar: {e}")
 
 
-def chave_sessao(aba, q_id):
+def validar_questao_callback(ref, radio_key, ops, gabarito,
+                              explicacao, pegadinha, materia, topico,
+                              questao_id, usuario):
     """
-    Gera chave única combinando aba + id da questão.
-    FUNDAMENTAL para evitar colisão entre abas com IDs iguais.
-    Ex.: Juridica Q1 → 'Legislacao_Juridica__1'
-         Institucional Q1 → 'Legislacao_Institucional__1'
+    Callback do botão Validar.
+    Grava no log com a coluna Ref = Materia_ID.
+    Salva resultado no session_state usando a mesma Ref como chave.
     """
-    return f"{aba}__{q_id}"
-
-
-def validar_questao_callback(aba, q_id, radio_key, ops, gabarito,
-                              explicacao, pegadinha, materia, topico, usuario):
     escolha = st.session_state[radio_key]
     letra   = [l for l, t in ops.items() if t == escolha][0]
     status  = "Acerto" if letra == str(gabarito).strip().upper() else "Erro"
 
-    registrar_log("Log_Progresso", {
+    registrar_log({
         "Usuario": usuario,
-        "Aba":     aba,        # ← registra a aba de origem para filtro correto
         "Materia": materia,
         "Titulo":  topico,
-        "Questao": q_id,
+        "Questao": questao_id,
         "Status":  status,
-        "Data":    datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+        "Data":    datetime.datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "Ref":     ref,          # ← coluna G: identificador sem colisão
     })
 
-    k = chave_sessao(aba, q_id)
-    st.session_state[f"status_q_{k}"] = status
-    st.session_state[f"gab_q_{k}"]    = gabarito
-    st.session_state[f"exp_q_{k}"]    = explicacao
-    st.session_state[f"pega_q_{k}"]   = pegadinha
+    # Persiste na sessão atual usando a Ref como chave
+    st.session_state[f"status_q_{ref}"] = status
+    st.session_state[f"gab_q_{ref}"]    = gabarito
+    st.session_state[f"exp_q_{ref}"]    = explicacao
+    st.session_state[f"pega_q_{ref}"]   = pegadinha
 
 
 def reset_materia(usuario, materia_alvo):
+    """Zera histórico de uma matéria específica do usuário."""
     try:
         for aba_nome in ["Assuntos_Estudados", "Log_Progresso"]:
             df   = conn.read(spreadsheet=MINHA_URL, worksheet=aba_nome, ttl=0)
@@ -334,7 +326,8 @@ if not st.session_state.autenticado:
                 if not df_u.empty:
                     col_usu = next((c for c in df_u.columns if 'usuario'  in c.lower()), df_u.columns[0])
                     col_sen = next((c for c in df_u.columns if 'senha'    in c.lower()), df_u.columns[1])
-                    col_val = next((c for c in df_u.columns if 'validade' in c.lower() or 'expiracao' in c.lower()), None)
+                    col_val = next((c for c in df_u.columns if 'validade' in c.lower()
+                                    or 'expiracao' in c.lower()), None)
                     user_row = df_u[df_u[col_usu].str.lower() == u_input]
 
                     if not user_row.empty and str(user_row.iloc[0][col_sen]) == p_input:
@@ -378,6 +371,26 @@ df_hist_q = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Log_Progres
 df_hist_a = limpar_dados(conn.read(spreadsheet=MINHA_URL, worksheet="Assuntos_Estudados", ttl="2m"))
 nome_exibir = st.session_state.usuario.split('@')[0].upper()
 
+# Pré-computa o conjunto de Refs já resolvidas pelo usuário atual
+# usando a coluna G (Ref = Materia_ID) — identificador sem colisão
+refs_resolvidas_banco: set = set()
+if not df_hist_q.empty:
+    col_u_g = next((c for c in df_hist_q.columns if 'usuario' in c.lower()), df_hist_q.columns[0])
+    df_meu_g = df_hist_q[df_hist_q[col_u_g].str.lower() == st.session_state.usuario]
+
+    # Tenta usar a coluna Ref (col G) — disponível na planilha atualizada
+    if 'Ref' in df_meu_g.columns:
+        refs_resolvidas_banco = set(df_meu_g['Ref'].dropna().str.strip().tolist())
+    else:
+        # Fallback: reconstrói a Ref a partir de Materia + Questao
+        # para compatibilidade com logs antigos sem a coluna Ref
+        col_m_g = next((c for c in df_meu_g.columns if 'materia' in c.lower()), df_meu_g.columns[1])
+        col_q_g = next((c for c in df_meu_g.columns if 'questao' in c.lower()), df_meu_g.columns[3])
+        refs_resolvidas_banco = set(
+            montar_ref(row[col_m_g], row[col_q_g])
+            for _, row in df_meu_g.iterrows()
+        )
+
 
 # ════════════════════════════════════════════════════════════════
 #  SIDEBAR
@@ -401,7 +414,7 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-    # Stats rápidas no rodapé da sidebar
+    # Stats rápidas
     if not df_hist_q.empty:
         col_u_sb = next((c for c in df_hist_q.columns if 'usuario' in c.lower()), df_hist_q.columns[0])
         col_s_sb = next((c for c in df_hist_q.columns if 'status'  in c.lower()), df_hist_q.columns[4])
@@ -446,16 +459,17 @@ if menu == "📝  Simulado":
             st.warning("Nenhuma questão encontrada nesta área.")
             st.stop()
 
+        # Garante que há colunas suficientes
         while df_q.shape[1] < 13:
             df_q[f"coluna_{df_q.shape[1]}"] = ""
 
-        col_id       = df_q.columns[0]
-        col_pergunta = df_q.columns[3]
-        col_gab      = df_q.columns[8]
-        col_exp      = df_q.columns[9]
-        col_pega     = df_q.columns[10]
-        col_mat      = df_q.columns[11]
-        col_topico   = df_q.columns[12]
+        col_id       = df_q.columns[0]   # ID numérico da questão
+        col_pergunta = df_q.columns[3]   # Enunciado
+        col_gab      = df_q.columns[8]   # Gabarito (A/B/C/D)
+        col_exp      = df_q.columns[9]   # Explicação
+        col_pega     = df_q.columns[10]  # Pegadinha CRS
+        col_mat      = df_q.columns[11]  # Matéria (ex: "EMEMG", "Direito Penal Militar")
+        col_topico   = df_q.columns[12]  # Tópico/Título
 
         leis = sorted([x for x in df_q[col_mat].unique() if str(x).lower() not in ['nan', '']])
         c1, c2 = st.columns(2)
@@ -467,7 +481,7 @@ if menu == "📝  Simulado":
         with c2:
             sel_titulo = st.selectbox("Tópico", ["📋  VER TODOS"] + titulos)
 
-        # ── Marcar tópico estudado ──────────────────────────────
+        # ── Marcar tópico como estudado ────────────────────────
         if sel_titulo != "📋  VER TODOS":
             id_topico   = f"{sel_lei} - {sel_titulo}"
             ja_estudado = False
@@ -484,60 +498,47 @@ if menu == "📝  Simulado":
                 st.markdown('<div class="feedback-box feedback-acerto">✅  Tópico marcado como <b>ESTUDADO</b> — bom trabalho, combatente!</div>', unsafe_allow_html=True)
             else:
                 if st.button("🏁  Marcar Tópico como Estudado"):
-                    registrar_log("Assuntos_Estudados", {
-                        "Usuario": st.session_state.usuario, "Materia": sel_lei,
-                        "Topico": id_topico, "Status": "Concluído",
-                        "Data": datetime.datetime.now().strftime("%d/%m/%Y")
+                    registrar_log({   # reusa registrar_log mas grava em outra aba
+                        "Usuario": st.session_state.usuario,
+                        "Materia": sel_lei,
+                        "Topico":  id_topico,
+                        "Status":  "Concluído",
+                        "Data":    datetime.datetime.now().strftime("%d/%m/%Y")
                     })
-                    st.cache_data.clear()
-                    st.rerun()
+                    # Para esta operação específica usa a aba Assuntos_Estudados
+                    try:
+                        df_at = conn.read(spreadsheet=MINHA_URL, worksheet="Assuntos_Estudados", ttl=0)
+                        novo  = {"Usuario": st.session_state.usuario, "Materia": sel_lei,
+                                 "Topico": id_topico, "Status": "Concluído",
+                                 "Data": datetime.datetime.now().strftime("%d/%m/%Y")}
+                        conn.update(spreadsheet=MINHA_URL, worksheet="Assuntos_Estudados",
+                                    data=pd.concat([df_at, pd.DataFrame([novo])], ignore_index=True))
+                        st.cache_data.clear()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao marcar tópico: {e}")
 
         st.divider()
 
         df_exibir = df_f if sel_titulo == "📋  VER TODOS" else df_f[df_f[col_topico] == sel_titulo]
 
-        # ── CORREÇÃO BUG 2 ──────────────────────────────────────
-        # Obtém apenas os IDs resolvidos NESTA ABA pelo usuário atual.
-        # Abas diferentes podem ter Q1, Q2, Q3... — sem esse filtro
-        # resolver Q1 da Institucional marcava Q1 da Jurídica como feita.
-        minhas_q_banco = set()
-        if not df_hist_q.empty:
-            col_uhu   = next((c for c in df_hist_q.columns if 'usuario' in c.lower()), df_hist_q.columns[0])
-            col_qhist = next((c for c in df_hist_q.columns if 'questao' in c.lower()), df_hist_q.columns[3])
-            df_meu    = df_hist_q[df_hist_q[col_uhu].str.lower() == st.session_state.usuario].copy()
-
-            # Filtro primário: coluna Aba (disponível a partir desta versão)
-            if 'Aba' in df_meu.columns:
-                df_meu = df_meu[df_meu['Aba'] == area]
-            else:
-                # Fallback para logs antigos sem coluna Aba:
-                # filtra pelas matérias pertencentes a esta aba
-                mats_desta_aba = set(str(x) for x in df_f[col_mat].unique())
-                col_mh = next((c for c in df_meu.columns if 'materia' in c.lower()), None)
-                if col_mh:
-                    df_meu = df_meu[df_meu[col_mh].isin(mats_desta_aba)]
-
-            minhas_q_banco = set(
-                str(x).split('.')[0].strip()
-                for x in df_meu[col_qhist].tolist()
-            )
-
         # ── Barra de progresso do bloco ─────────────────────────
         total_bloco  = len(df_exibir)
         feitas_bloco = sum(
             1 for _, r in df_exibir.iterrows()
-            if (str(r[col_id]).split('.')[0].strip() in minhas_q_banco)
-            or (f"status_q_{chave_sessao(area, str(r[col_id]).split('.')[0].strip())}" in st.session_state)
+            if montar_ref(r[col_mat], r[col_id]) in refs_resolvidas_banco
+            or f"status_q_{montar_ref(r[col_mat], r[col_id])}" in st.session_state
         )
         st.markdown(barra_progresso("Progresso neste bloco", feitas_bloco, total_bloco), unsafe_allow_html=True)
 
-        # ── Renderiza questões ──────────────────────────────────
+        # ── Renderiza cada questão ──────────────────────────────
         for _, row in df_exibir.iterrows():
-            q_id = str(row[col_id]).split('.')[0].strip()
-            k    = chave_sessao(area, q_id)   # chave única: aba + id
+            # ref é o identificador único global desta questão
+            ref = montar_ref(row[col_mat], row[col_id])
+            q_id_limpo = str(row[col_id]).split('.')[0].strip()
 
-            feita_banco  = q_id in minhas_q_banco
-            feita_agora  = f"status_q_{k}" in st.session_state
+            feita_banco  = ref in refs_resolvidas_banco
+            feita_agora  = f"status_q_{ref}" in st.session_state
             ja_resolvida = feita_banco or feita_agora
 
             badge_html = (
@@ -549,7 +550,7 @@ if menu == "📝  Simulado":
 
             st.markdown(f"""
             <div class="{card_class}">
-                <div class="q-numero">Q{q_id} {badge_html}</div>
+                <div class="q-numero">Q{q_id_limpo} {badge_html}</div>
                 <div class="q-texto">{row[col_pergunta]}</div>
             </div>
             """, unsafe_allow_html=True)
@@ -557,12 +558,11 @@ if menu == "📝  Simulado":
             ops    = {"A": row.iloc[4], "B": row.iloc[5], "C": row.iloc[6], "D": row.iloc[7]}
             opcoes = [v for v in ops.values() if str(v).lower() != 'nan' and str(v).strip() != '']
 
-            # key do radio inclui a aba — sem isso Streamlit reutilizava
-            # a mesma chave de widget entre abas e travava a interface
+            # Chave do widget usa a Ref — sem colisão entre abas
             st.radio(
-                f"Resposta Q{q_id}:",
+                f"Resposta Q{q_id_limpo}:",
                 opcoes,
-                key=f"r_{k}",
+                key=f"r_{ref}",
                 label_visibility="collapsed",
                 disabled=ja_resolvida
             )
@@ -570,26 +570,27 @@ if menu == "📝  Simulado":
             if not ja_resolvida:
                 topico_log = row[col_topico] if sel_titulo == "📋  VER TODOS" else sel_titulo
                 st.button(
-                    f"Validar Resposta — Q{q_id}",
-                    key=f"b_{k}",
+                    f"Validar Resposta — Q{q_id_limpo}",
+                    key=f"b_{ref}",
                     use_container_width=True,
                     on_click=validar_questao_callback,
-                    args=(area, q_id, f"r_{k}", ops, row[col_gab],
-                          row[col_exp], row[col_pega], sel_lei, topico_log,
-                          st.session_state.usuario)
+                    args=(ref, f"r_{ref}", ops, row[col_gab],
+                          row[col_exp], row[col_pega],
+                          str(row[col_mat]).strip(), topico_log,
+                          q_id_limpo, st.session_state.usuario)
                 )
             else:
                 if feita_agora:
-                    status = st.session_state[f"status_q_{k}"]
+                    status = st.session_state[f"status_q_{ref}"]
                     if status == "Acerto":
                         st.markdown('<div class="feedback-box feedback-acerto">🎯  ACERTOU! Excelente raciocínio tático.</div>', unsafe_allow_html=True)
                     else:
-                        gab = st.session_state[f"gab_q_{k}"]
+                        gab = st.session_state[f"gab_q_{ref}"]
                         st.markdown(f'<div class="feedback-box feedback-erro">❌  ERROU! Gabarito correto: <b>Alternativa {gab}</b></div>', unsafe_allow_html=True)
-                    exp = str(st.session_state[f"exp_q_{k}"]).strip()
+                    exp = str(st.session_state[f"exp_q_{ref}"]).strip()
                     if exp.lower() not in ['nan', 'none', '']:
                         st.markdown(f'<div class="feedback-box feedback-info">💡  <b>Comentário:</b> {exp}</div>', unsafe_allow_html=True)
-                    pega = str(st.session_state[f"pega_q_{k}"]).strip()
+                    pega = str(st.session_state[f"pega_q_{ref}"]).strip()
                     if pega.lower() not in ['nan', 'none', '']:
                         st.markdown(f'<div class="feedback-box feedback-warn">🚨  <b>Pegadinha CRS:</b> {pega}</div>', unsafe_allow_html=True)
                 else:
@@ -635,6 +636,7 @@ elif menu == "📊  Performance":
     total_q = len(meu_h)
     taxa    = acertos / total_q * 100
 
+    # ── Métricas ────────────────────────────────────────────────
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.markdown(f'<div class="metric-card"><div class="metric-valor">{total_q}</div><div class="metric-label">Questões Feitas</div></div>', unsafe_allow_html=True)
@@ -691,7 +693,7 @@ elif menu == "📊  Performance":
             xaxis=dict(range=[0,100], dtick=20, gridcolor='rgba(255,255,255,0.06)',
                        tickfont=dict(color='#475569', size=11)),
             yaxis=dict(tickfont=dict(color='#94a3b8', size=12)),
-            margin=dict(l=180, r=20, t=20, b=20),
+            margin=dict(l=200, r=20, t=20, b=20),
             font=dict(family='Inter')
         )
         st.plotly_chart(fig_p, use_container_width=True)
@@ -726,7 +728,7 @@ elif menu == "📊  Performance":
     )
     st.plotly_chart(fig_t, use_container_width=True)
 
-    # ── Reset ────────────────────────────────────────────────────
+    # ── Reset de matéria ─────────────────────────────────────────
     st.divider()
     st.markdown('<p class="secao-titulo" style="font-size:1rem; color:#f87171;">🧹 Limpeza de Prontuário</p>', unsafe_allow_html=True)
     col_m_reset = next((c for c in meu_h.columns if 'materia' in c.lower()), meu_h.columns[1])
@@ -751,7 +753,7 @@ elif menu == "📚  Teoria":
             col_cap      = df_teoria.columns[1]
             col_res      = df_teoria.columns[2]
             col_palavras = df_teoria.columns[3] if df_teoria.shape[1] > 3 else None
-            col_ref      = df_teoria.columns[4] if df_teoria.shape[1] > 4 else None
+            col_ref_t    = df_teoria.columns[4] if df_teoria.shape[1] > 4 else None
 
             materias = sorted([x for x in df_teoria[col_mat_t].unique() if str(x).lower() not in ['nan', '']])
             sel_mat  = st.selectbox("Selecione a Matéria:", materias)
@@ -771,10 +773,10 @@ elif menu == "📚  Teoria":
                             tags_html += f'<span style="background:rgba(37,99,235,0.15);color:#93c5fd;padding:2px 8px;border-radius:20px;font-size:0.72rem;margin-right:4px;">{p.strip()}</span>'
 
                 ref_html = ""
-                if col_ref:
-                    ref = str(row[col_ref]).strip()
-                    if ref.lower() not in ['nan', 'none', '']:
-                        ref_html = f'<div style="font-size:0.72rem;color:#c8a84b;margin-top:10px;">📌 Edital: {ref}</div>'
+                if col_ref_t:
+                    ref_val = str(row[col_ref_t]).strip()
+                    if ref_val.lower() not in ['nan', 'none', '']:
+                        ref_html = f'<div style="font-size:0.72rem;color:#c8a84b;margin-top:10px;">📌 Edital: {ref_val}</div>'
 
                 st.markdown(f"""
                 <div class="card-questao" style="margin-bottom:14px;">
